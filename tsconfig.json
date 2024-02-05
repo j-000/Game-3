@@ -1,0 +1,10 @@
+{
+    "compilerOptions": {
+        "outDir": ".",
+        "target": "ES2018",
+        "module": "commonJS",
+    },
+    "files": [
+        "main.ts"
+    ]
+}

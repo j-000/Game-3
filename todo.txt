@@ -1,0 +1,18 @@
+[x] Setup project
+[x] Create player
+[x] Gravity
+[x] Player movement
+[ ] Background sprite
+[ ] Collision blocks
+[ ] Collision detection
+[ ] Sprite animation
+[ ] Hitbox implementation
+[ ] Sprite swapping
+[ ] Entering doors
+[ ] Changing levels
+[ ] Next steps
+[ ] Map creation (manual)
+[ ] Map creation (programatically)
+[ ] Character powers
+[ ] Character evolution
+[ ] Enemies
