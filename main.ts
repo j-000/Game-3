@@ -112,72 +112,6 @@ const collisions = {
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
 }
 
-class RectangleHitbox {
-  pos: Vector2D;
-  vel: Vector2D;
-  width: number;
-  height: number;
-
-  constructor(w: number, h: number) {
-    this.width = w;
-    this.height = h;
-    this.pos = new Vector2D(0, 0);
-    this.vel = new Vector2D(0, 0);
-  }
-
-  draw(ctx: CanvasRenderingContext2D) {
-    ctx.rect(this.pos.x, this.pos.y, this.width, this.height);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(this.pos.x, this.pos.y, 2, 0, Math.PI * 2);
-    ctx.fillStyle = 'red';
-    ctx.fill();
-  }
-
-  update() {
-    this.pos = this.pos.add(this.vel);
-  }
-
-}
-
-interface PlayerOptions {
-  width: number
-  height: number
-  jumpFactor: number
-  speedFactor: number
-}
-
-class Player extends RectangleHitbox {
-  jumpFactor: number;
-  speedFactor: number;
-
-  constructor(args: PlayerOptions) {
-    super(args.width, args.height);
-    this.jumpFactor = args.jumpFactor;
-    this.speedFactor = args.speedFactor;
-  }
-
-  stop() {
-    this.vel = this.vel.multiply(0);
-  }
-
-  move(direction: string) {
-    switch (direction) {
-      case 'ArrowLeft':
-        this.vel.x = -this.speedFactor
-        break;
-      case 'ArrowRight':
-        this.vel.x = this.speedFactor
-        break;
-    }
-  }
-
-  jump() {
-    if (this.vel.y == 0) {
-      this.vel = this.vel.add(new Vector2D(0, this.jumpFactor));
-    }
-  }
-}
 
 interface TilesOptions {
   xCount: number
@@ -185,6 +119,7 @@ interface TilesOptions {
   width: number // assuming squares only
   flag: number  // number used to identify a collision block.
 }
+
 interface SpriteOptions {
   x: number
   y: number
@@ -211,16 +146,8 @@ class Sprite {
     this.pos = new Vector2D(args.x, args.y);
     this.image = new Image();
     this.image.src = args.image.src;
-    this.image.onload = () => {
-      this.loaded = true
-    }
-    this.imageOptions = {
-      src: args.image.src,
-      sw: args.image.sw,
-      sh: args.image.sh,
-      dw: args.image.dw,
-      dh: args.image.dh
-    }
+    this.image.onload = () => {this.loaded = true};
+    this.imageOptions = args.image;
     this.tiles = args.tiles;
   }
 
@@ -236,6 +163,207 @@ class Sprite {
   }
 }
 
+class ActorSprite {
+  pos: Vector2D;
+  image: HTMLImageElement;
+  loaded: boolean;
+  w: number;
+  h: number;
+
+  currentFrame: number;
+  maxFrame: number;
+  animationTimer: number;
+  animationCounter: number;
+
+  constructor(pos: Vector2D, src: string){
+    this.pos = pos;
+
+    this.currentFrame = 0;
+    this.animationTimer = 80;
+    this.animationCounter = 0;
+    this.maxFrame = 11;
+    
+    this.image = new Image();
+    this.image.src = src;
+    this.image.onload = () => {
+      this.loaded = true
+      this.w = this.image.width / this.maxFrame
+      this.h = this.image.height
+    };
+  }
+
+  draw(ctx: CanvasRenderingContext2D){
+    let cropbox = {
+      position: {
+        x: this.currentFrame * this.w,
+        y: 0
+      },
+      w: this.w,
+      h: this.h
+    }
+    ctx.drawImage(this.image, 
+      cropbox.position.x, 
+      cropbox.position.y,
+      cropbox.w, 
+      cropbox.h,
+      this.pos.x, 
+      this.pos.y,
+      this.w, 
+      this.h);
+  }
+
+  animate(deltaTime: number){
+    this.animationCounter += deltaTime;
+    if(this.animationCounter >= this.animationTimer){
+      if(this.currentFrame > this.maxFrame - 2) {
+        this.currentFrame = 0;
+      } else {
+        this.currentFrame += 1;
+        this.animationCounter = 0;
+      }
+    }
+  }
+}
+
+interface PlayerOptions {
+  game?: GameEngine
+  width: number
+  height: number
+  jumpFactor: number
+  speedFactor: number
+}
+
+interface PlayerUpdateOptions {
+  gravity: Vector2D
+  collisionBlocks: Array<CollisionBlock>
+}
+
+class Player{
+  game: GameEngine;
+  jumpFactor: number;
+  speedFactor: number;
+  pos: Vector2D;
+  vel: Vector2D;
+  width: number;
+  height: number;
+  sprite: ActorSprite
+
+  constructor(args: PlayerOptions) {
+    this.width = args.width;
+    this.height = args.height;
+    this.pos = new Vector2D(400, 200);
+    this.vel = new Vector2D(0, 0);
+    this.jumpFactor = args.jumpFactor;
+    this.speedFactor = args.speedFactor;
+    this.game = args.game;
+    this.sprite = new ActorSprite(this.pos, './img/king/idle.png');
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    let ratio = this.sprite.w / this.width;
+    ctx.save()
+    ctx.translate(-this.sprite.w/ratio, -this.sprite.h/ratio);
+    this.sprite.draw(ctx);
+    ctx.restore()
+
+    if(this.game.debug.isOn){
+      // Player hitbox (implements collisions)
+      ctx.beginPath();
+      ctx.strokeStyle = 'blue';
+      ctx.rect(this.pos.x, this.pos.y, this.width, this.height);
+      ctx.stroke();
+
+      // Image box (does not implement collisions)
+      ctx.strokeStyle = 'yellow'
+      ctx.beginPath()
+      ctx.save();
+      ctx.translate(-this.sprite.w/ratio, -this.sprite.h/ratio);
+      ctx.rect(this.pos.x, this.pos.y, this.sprite.w, this.sprite.h);
+      ctx.stroke()
+      ctx.restore()
+    }
+
+  }
+
+  update(args: PlayerUpdateOptions){
+    /**
+     * Update must be separated into X-Axis and Y-Axis to avoid errors.
+     * First we update position on X-axis and then check for collisions on this axis
+     * Then we update position on Y-axis and then check for collision on this axis
+     */  
+    // Update X-pos with X-vel
+    this.pos.x += this.vel.x;
+    // Check for collision with blocks in X-axis
+    this.checkCollisionXaxis(args.collisionBlocks);
+    // Apply gravity - this will update the Y-vel with Gravity.
+    this.game.applyGravity(this); 
+    // Update Y-position with Y-velocity
+    this.pos.y += this.vel.y;
+    // Check for collision with blocks in Y-axis
+    this.checkCollisionYaxis(args.collisionBlocks)
+  }
+
+  checkCollisionYaxis(blocks: Array<CollisionBlock>){
+    let player = this;
+    for(let block of blocks){
+      if(player.pos.x <= block.pos.x + block.w &&
+        player.pos.x + player.width >= block.pos.x &&
+        player.pos.y + player.height >= block.pos.y &&
+        player.pos.y <= block.pos.y + block.h
+        ) {
+          if(player.vel.y < 0) {
+            player.pos.y = block.pos.y + block.h + 0.01;
+          }
+          if(player.vel.y > 0){
+            player.pos.y = block.pos.y - player.height - 0.01;
+          }
+          player.vel.y = 0;
+          break 
+      }
+    }
+  }
+  checkCollisionXaxis(blocks: Array<CollisionBlock>){
+    let player = this;
+    for(let block of blocks){
+      if(player.pos.x <= block.pos.x + block.w &&
+        player.pos.x + player.width >= block.pos.x &&
+        player.pos.y + player.height >= block.pos.y &&
+        player.pos.y <= block.pos.y + block.h
+        ) {
+          if(player.vel.x < 0) {
+            player.pos.x = block.pos.x + block.w + 0.01;
+          }
+          if(player.vel.x > 0){
+            player.pos.x = block.pos.x - player.width - 0.01;
+          }
+          break 
+      }
+    }
+  }
+
+  stop() {
+    this.vel = this.vel.multiply(0);
+  }
+
+  move(direction: string) {
+    switch (direction) {
+      case 'ArrowLeft':
+        this.vel.x = -this.speedFactor
+        break;
+      case 'ArrowRight':
+        this.vel.x = this.speedFactor
+        break;
+    }
+  }
+
+  jump() {
+    if (this.vel.y == 0) {
+      this.vel = this.vel.add(new Vector2D(0, this.jumpFactor));
+    }
+  }
+}
+
+
 
 class CollisionBlock {
   pos: Vector2D;
@@ -247,8 +375,12 @@ class CollisionBlock {
     this.h = h;
   }
   draw(ctx: CanvasRenderingContext2D){
-    ctx.rect(this.pos.x, this.pos.y, this.w, this.h);
-    ctx.stroke();
+    ctx.beginPath()
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.3)'
+    ctx.fillRect(this.pos.x, this.pos.y, this.w, this.h);
+    ctx.fillStyle = 'yellow'
+    ctx.arc(this.pos.x, this.pos.y, 3, 0, Math.PI * 2);
+    ctx.fill()
   }
 }
 
@@ -256,6 +388,8 @@ class CollisionBlock {
 interface GameEngineOptions {
   gravity: number
   scale?: number
+  player: PlayerOptions
+  startLevel: number
 }
 
 interface Debug {
@@ -274,47 +408,65 @@ class GameEngine {
   background: Sprite;
   debug: Debug
   blocks: Array<CollisionBlock>;
+  startLevel: number;
 
   constructor(canvas: HTMLCanvasElement, args: GameEngineOptions) {
-    this.canvas = canvas;
-    this.gravity = new Vector2D(0, args.gravity);
-    this.player = new Player({
-      width: 50,
-      height: 50,
-      jumpFactor: -15,
-      speedFactor: 2
-    });
     this.debug = {
       isOn: true,
       timer: 0,
       fps: '0'
     }
-    this.background = new Sprite({
-      x: 0, 
-      y: 0,
-      image: {
-        src: './img/backgroundLevel1.png',
-        sw: 1024,
-        sh: 576,
-        dw: this.canvas.width,
-        dh: this.canvas.height,
-      },
-      tiles: {
-        xCount: 16,
-        yCount: 9,
-        width: 64,
-        flag: 292
-      }
-    })
-    
-    this.blocks = new Array<CollisionBlock>();
+    this.startLevel = args.startLevel;
+    this.canvas = canvas;
+    this.gravity = new Vector2D(0, args.gravity);
+
+    this.initPlayer(args.player);
+    this.initBackground();
     this.initCollisionBlocks();
 
+    // Add event listeners for key presses
     window.addEventListener('keydown', e => this.handleKeyPressed(e));
     window.addEventListener('keyup', e => this.handleKeyReleased(e));
   }
 
+  get LEVELS(){
+    return {
+      1: {
+        image: {
+          src: './img/backgroundLevel1.png',
+          sw: 1024,
+          sh: 576,
+          dw: this.canvas.width,
+          dh: this.canvas.height,
+        },
+        tiles: {
+          xCount: 16,
+          yCount: 9,
+          width: 64,
+          flag: 292
+        }
+      }
+    }
+  }
+
+  initBackground(){
+    this.background = new Sprite({
+      x: 0, 
+      y: 0,
+      image: this.LEVELS[this.startLevel].image,
+      tiles: this.LEVELS[this.startLevel].tiles
+    })
+  }
+  
+  initPlayer(options: PlayerOptions){
+    this.player = new Player({
+      game: this, // add reference to game object
+      ...options
+    });
+  }
+
   initCollisionBlocks(){
+    this.blocks = new Array<CollisionBlock>();
     // loop through the 2D array in columns and rows
     for(let col = 0; col < this.background.tiles.xCount; col++){
       for(let row = 0; row < this.background.tiles.yCount; row++){
@@ -373,7 +525,7 @@ class GameEngine {
     let hasHitLeftSide = playerSides.left <= 0;
     let hasHitUpSide = playerSides.up <= 0;
     let hasHitRightSide = playerSides.right >= this.canvas.width;
-    let hasHitDownSide = playerSides.down >= this.canvas.height;
+    let hasHitDownSide = playerSides.down + p.height >= this.canvas.height;
     if (hasHitLeftSide) {
       this.player.pos.x = 0;
       this.player.vel.x = 0;
@@ -385,10 +537,6 @@ class GameEngine {
     if (hasHitRightSide) {
       this.player.vel.x = 0;
       this.player.pos.x = this.canvas.width - this.player.width;
-    }
-    if (hasHitDownSide) {
-      this.player.vel.y = 0;
-      this.player.pos.y = this.canvas.height - this.player.height;
     }
   }
 
@@ -402,9 +550,9 @@ class GameEngine {
        */
       body.vel.y = 0;
       /**
-      Y-vel may contain more pixels than the diference between
-      the bottom side of the player and the canvas height, making the player sink below y-axis.
-      To prevent this, we manually set the player position on the ground.
+       * Y-vel may contain more pixels than the diference between
+       * the bottom side of the player and the canvas height, making the player sink below y-axis.
+       * To prevent this, we manually set the player position on the ground.
       */
       body.pos.y = this.canvas.height - body.height;
     }
@@ -413,20 +561,24 @@ class GameEngine {
   render(ctx: CanvasRenderingContext2D, deltaTime: number): void {
     // Add deltaTime to timer;
     this.debug.timer += deltaTime;
-
+    
     /**
      * Background
      */
     this.background.draw(ctx);
     
-    // collision blocks (64 x 64 but consider scale of 0.8)
+    /**
+     * [Debug mode]
+     * Collision blocks
+     * Drawing only needs to happen in debug mode. 
+     * Checkign for collisions doesn't require drawing them.
+     */
     if(this.debug.isOn) {
       for(let block of this.blocks){
         block.draw(ctx)
       }
     }
     
-
     /**
      * [Debug mode]
      * Draw FPS indicator; Updates every second.
@@ -436,27 +588,29 @@ class GameEngine {
       ctx.fillStyle = 'white';
       ctx.fillText(`[ ${this.debug.fps} fps ]`, 10, 10);
       ctx.restore();
-
-      if (this.debug.timer >= ONE_SECOND) {
-        this.debug.fps = (1000 / deltaTime).toFixed();
-        this.debug.timer = 0; // reset timer
-      }
     }
 
     /**
      * Player
      */
     this.player.draw(ctx);
-    this.player.update();
-    this.checkCanvasCollision(this.player);
-    this.applyGravity(this.player);
+    this.player.sprite.animate(deltaTime);
+    this.player.update({
+      gravity: this.gravity,
+      collisionBlocks: this.blocks
+    })
 
+
+    // Reset timer
+    if (this.debug.timer > ONE_SECOND) {
+      this.debug.fps = (1000 / deltaTime).toFixed();
+      this.debug.timer = 0;
+    }
   }
-
 }
 
 
-function animate() {
+function main() {
   // Once all HTML and images are loaded
   window.addEventListener('load', () => {
     let scale = 0.8;
@@ -490,7 +644,14 @@ function animate() {
     // Instanciate a Game instance
     game = new GameEngine(canvas, {
       scale,
-      gravity: 1
+      gravity: 1,
+      startLevel: 1,
+      player : { 
+        width: 50,
+        height: 50,
+        jumpFactor: -20,
+        speedFactor: 5
+      }
     });
     
     let lastTime = 0;
@@ -511,4 +672,4 @@ function animate() {
   })
 }
 let game: GameEngine;
-animate();
+main();

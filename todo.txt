@@ -3,10 +3,10 @@
 [x] Gravity
 [x] Player movement
 [x] Background sprite
-[ ] Collision blocks
-[ ] Collision detection
-[ ] Sprite animation
-[ ] Hitbox implementation
+[x] Collision blocks
+[x] Collision detection
+[x] Sprite animation
+[x] Hitbox implementation
 [ ] Sprite swapping
 [ ] Entering doors
 [ ] Changing levels
