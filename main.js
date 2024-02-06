@@ -76,6 +76,19 @@ class Vector2D {
         return new Vector2D(this.x * scalar, this.y * scalar);
     }
 }
+const collisions = {
+    level_1: [
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 0],
+        [0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 292, 0],
+        [0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 292, 0],
+        [0, 292, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 292, 0],
+        [0, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    ]
+};
 class RectangleHitbox {
     constructor(w, h) {
         this.width = w;
@@ -115,9 +128,49 @@ class Player extends RectangleHitbox {
         }
     }
     jump() {
-        this.vel = this.vel.add(new Vector2D(0, this.jumpFactor));
+        if (this.vel.y == 0) {
+            this.vel = this.vel.add(new Vector2D(0, this.jumpFactor));
+        }
     }
 }
+class Sprite {
+    constructor(args) {
+        this.pos = new Vector2D(args.x, args.y);
+        this.image = new Image();
+        this.image.src = args.image.src;
+        this.image.onload = () => {
+            this.loaded = true;
+        };
+        this.imageOptions = {
+            src: args.image.src,
+            sw: args.image.sw,
+            sh: args.image.sh,
+            dw: args.image.dw,
+            dh: args.image.dh
+        };
+        this.tiles = args.tiles;
+    }
+    draw(ctx) {
+        if (!this.loaded)
+            return; // Skip if not loaded
+        let img = this.image;
+        let w = this.imageOptions.dw || img.width;
+        let h = this.imageOptions.dh || img.height;
+        ctx.drawImage(this.image, this.pos.x, this.pos.y, w, h);
+    }
+}
+class CollisionBlock {
+    constructor(x, y, w, h) {
+        this.pos = new Vector2D(x, y);
+        this.w = w;
+        this.h = h;
+    }
+    draw(ctx) {
+        ctx.rect(this.pos.x, this.pos.y, this.w, this.h);
+        ctx.stroke();
+    }
+}
+const ONE_SECOND = 1000;
 class GameEngine {
     constructor(canvas, args) {
         this.canvas = canvas;
@@ -128,8 +181,52 @@ class GameEngine {
             jumpFactor: -15,
             speedFactor: 2
         });
+        this.debug = {
+            isOn: true,
+            timer: 0,
+            fps: '0'
+        };
+        this.background = new Sprite({
+            x: 0,
+            y: 0,
+            image: {
+                src: './img/backgroundLevel1.png',
+                sw: 1024,
+                sh: 576,
+                dw: this.canvas.width,
+                dh: this.canvas.height,
+            },
+            tiles: {
+                xCount: 16,
+                yCount: 9,
+                width: 64,
+                flag: 292
+            }
+        });
+        this.blocks = new Array();
+        this.initCollisionBlocks();
         window.addEventListener('keydown', e => this.handleKeyPressed(e));
         window.addEventListener('keyup', e => this.handleKeyReleased(e));
+    }
+    initCollisionBlocks() {
+        // loop through the 2D array in columns and rows
+        for (let col = 0; col < this.background.tiles.xCount; col++) {
+            for (let row = 0; row < this.background.tiles.yCount; row++) {
+                // Get an entry value
+                let block = collisions.level_1[row][col];
+                // Calculate the ratio of the image and the canvas (makes window responsive)
+                let xRatio = this.canvas.width / this.background.imageOptions.sw;
+                let yRatio = this.canvas.height / this.background.imageOptions.sh;
+                let tileW = this.background.tiles.width;
+                let x = Math.floor(tileW * col * xRatio); // x position
+                let y = Math.floor(tileW * row * yRatio); // y position
+                let w = Math.floor(tileW * xRatio); // w 
+                let h = Math.floor(tileW * yRatio); // h 
+                if (block === this.background.tiles.flag) {
+                    this.blocks.push(new CollisionBlock(x, y, w, h));
+                }
+            }
+        }
     }
     handleKeyReleased(e) {
         const LEFT = 'ArrowLeft';
@@ -142,6 +239,7 @@ class GameEngine {
         const SPACE = ' ';
         const LEFT = 'ArrowLeft';
         const RIGHT = 'ArrowRight';
+        const D = 'd';
         if (e.key == SPACE) {
             this.player.jump();
         }
@@ -150,6 +248,10 @@ class GameEngine {
         }
         if (e.key == LEFT) {
             this.player.move(LEFT);
+        }
+        if (e.key == D) {
+            this.debug.isOn = !this.debug.isOn; // toggle debug mode
+            console.log(this);
         }
     }
     checkCanvasCollision(p) {
@@ -199,7 +301,32 @@ class GameEngine {
         }
     }
     render(ctx, deltaTime) {
-        // Draw game
+        // Add deltaTime to timer;
+        this.debug.timer += deltaTime;
+        /**
+         * Background
+         */
+        this.background.draw(ctx);
+        // collision blocks (64 x 64 but consider scale of 0.8)
+        if (this.debug.isOn) {
+            for (let block of this.blocks) {
+                block.draw(ctx);
+            }
+        }
+        /**
+         * [Debug mode]
+         * Draw FPS indicator; Updates every second.
+         */
+        if (this.debug.isOn) {
+            ctx.save();
+            ctx.fillStyle = 'white';
+            ctx.fillText(`[ ${this.debug.fps} fps ]`, 10, 10);
+            ctx.restore();
+            if (this.debug.timer >= ONE_SECOND) {
+                this.debug.fps = (1000 / deltaTime).toFixed();
+                this.debug.timer = 0; // reset timer
+            }
+        }
         /**
          * Player
          */
@@ -212,10 +339,11 @@ class GameEngine {
 function animate() {
     // Once all HTML and images are loaded
     window.addEventListener('load', () => {
+        let scale = 0.8;
         const canvas = document.getElementById('canvas');
         // Get the browser window dimensions (not more than 80%)
-        const windowWidth = window.innerWidth * 0.8;
-        const windowHeight = window.innerHeight * 0.8;
+        const windowWidth = window.innerWidth * scale;
+        const windowHeight = window.innerHeight * scale;
         const aspectRatio = 16 / 9;
         // Calculate the maximum dimensions while maintaining the aspect ratio
         let canvasWidth, canvasHeight;
@@ -235,9 +363,10 @@ function animate() {
         // Get canvas context and set some global defaults
         const ctx = canvas.getContext("2d");
         ctx.strokeStyle = 'white';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1;
         // Instanciate a Game instance
         game = new GameEngine(canvas, {
+            scale,
             gravity: 1
         });
         let lastTime = 0;
