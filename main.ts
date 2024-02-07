@@ -1,3 +1,9 @@
+/**
+ * A Vector2D is based on linear algebra definition 
+ * of a vector.
+ * Methods either provide a mathematical result or a
+ * new modified vector.
+ */
 class Vector2D {
   x: number;
   y: number;
@@ -96,6 +102,41 @@ class Vector2D {
 
   scale(scalar: number): Vector2D {
     return new Vector2D(this.x * scalar, this.y * scalar);
+  }
+}
+
+/**
+ * A Point is just a visible representation of a Vector2D 
+ * on the canvas.
+ */
+class Point {
+  pos: Vector2D;
+  name: string;
+  radius: number;
+  constructor(pos: Vector2D, name: string) {
+    /**
+     * pos  - Vector2D of x,y position
+     * name - A reference name for the point 
+     */
+    this.pos = pos;
+    this.radius = 5; // Default radius to 5 pixels.
+    this.name = name;
+  }
+
+  draw(ctx: CanvasRenderingContext2D){
+    /**
+     * Draw a white circle fill white
+     * and the property name on top.
+     */
+    if(!GAME.debug.isOn) return
+    ctx.save();
+    ctx.beginPath();
+    ctx.fillStyle = 'white';
+    ctx.fillText(this.name, this.pos.x, this.pos.y - 10)
+    ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = 'white';
+    ctx.fill();
+    ctx.restore();
   }
 }
 
@@ -209,28 +250,7 @@ class ActorSprite {
   }
 }
 
-class Point {
-  pos: Vector2D;
-  name: string;
-  radius: number;
-  constructor(pos: Vector2D, name: string) {
-    this.pos = pos;
-    this.radius = 5;
-    this.name = name;
-  }
 
-  draw(ctx: CanvasRenderingContext2D){
-    if(!GAME.debug.isOn) return
-    ctx.save();
-    ctx.beginPath();
-    ctx.fillStyle = 'white';
-    ctx.fillText(this.name, this.pos.x, this.pos.y - 10)
-    ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI * 2);
-    ctx.fillStyle = 'white';
-    ctx.fill();
-    ctx.restore();
-  }
-}
 
 interface PlayerOptions {
   game?: GameEngine
@@ -268,7 +288,7 @@ class Player{
 
   draw(ctx: CanvasRenderingContext2D) {
     /**
-     * Drawm player sprite
+     * Draw player sprite
      */
     let cropbox = this.sprite.cropbox;
     ctx.save();
