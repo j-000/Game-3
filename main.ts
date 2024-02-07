@@ -211,10 +211,12 @@ class ActorSprite {
 
 class Point {
   pos: Vector2D;
+  name: string;
   radius: number;
-  constructor(pos: Vector2D) {
+  constructor(pos: Vector2D, name: string) {
     this.pos = pos;
     this.radius = 5;
+    this.name = name;
   }
 
   draw(ctx: CanvasRenderingContext2D){
@@ -222,7 +224,7 @@ class Point {
     ctx.save();
     ctx.beginPath();
     ctx.fillStyle = 'white';
-    ctx.fillText('[SpawnPlace]', this.pos.x, this.pos.y - 10)
+    ctx.fillText(this.name, this.pos.x, this.pos.y - 10)
     ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI * 2);
     ctx.fillStyle = 'white';
     ctx.fill();
@@ -469,23 +471,32 @@ class SpawnPlace extends Point{
      * x, y - positions on X and Y axis.
      */
     let pos = new Vector2D(x, y);
-    super(pos);
+    super(pos, '[SpawnPlace]');
   }
 }
 
-class Door extends CollisionBlock{
+
+
+class Door extends Point{
   pos: Vector2D;
   sprite: ActorSprite; 
-  constructor(x: number, y: number, w: number, h: number){   
-    super(x, y, w, h); // CollisionBlock
+  constructor(x: number, y: number){   
+    let pos = new Vector2D(x, y);
+    super(pos, '[Door]');
     this.sprite = new ActorSprite(this.pos, './img/doorOpen.png', 5);
   }
 
   draw(ctx: CanvasRenderingContext2D): void {
-    
-    ctx.beginPath()
-    ctx.fillStyle = 'rgba(0, 0, 255, 0.15)'
-    ctx.fillRect(this.pos.x, this.pos.y, this.w, this.h);
+    /**
+     * Draw door's point of reference
+     */
+    super.draw(ctx); 
+
+
+
+    // ctx.beginPath()
+    // ctx.fillStyle = 'rgba(0, 0, 255, 0.15)'
+    // ctx.fillRect(this.pos.x, this.pos.y, this.w, this.h);
 
 
   }
@@ -633,7 +644,7 @@ class GameEngine {
           this.blocks.push(new SpawnPlace(x, y));
         }
         if(block === 290) {
-          this.blocks.push(new Door(x, y, w, h));          
+          this.blocks.push(new Door(x, y));          
         }
 
       }
@@ -733,10 +744,12 @@ class GameEngine {
       for(let block of this.blocks){
         switch (block.constructor.name) {
           case 'SpawnPlace':
-            let sp = block as SpawnPlace;
-            sp.draw(ctx);
+            let spawplace = block as SpawnPlace;
+            spawplace.draw(ctx);
             break;
           case 'Door':
+            let door = block as Door;
+            door.draw(ctx);
             break;
           case 'CollisionBlock':
             block.draw(ctx);
