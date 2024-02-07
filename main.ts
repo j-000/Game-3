@@ -105,6 +105,7 @@ class Vector2D {
   }
 }
 
+
 /**
  * A Point is just a visible representation of a Vector2D 
  * on the canvas.
@@ -139,6 +140,62 @@ class Point {
     ctx.restore();
   }
 }
+
+
+/**
+ * A CollisionBlock is an abstract element where it does not 
+ * get drawn onto the canvas. It only serves to check whether
+ * the player or others collide with certain areas of the map.
+ */
+class CollisionBlock {
+  pos: Vector2D;
+  w: number;
+  h: number;
+  constructor(x: number, y: number, w: number, h: number){
+    /**
+     * x, y - positions on X and Y axis.
+     * w, h - width and height
+     */
+    this.pos = new Vector2D(x, y);
+    this.w = w;
+    this.h = h;
+  }
+  draw(ctx: CanvasRenderingContext2D){
+    /**
+     * Draws a red rectangle with red color fill.
+     */
+    ctx.save();
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.15)';
+    ctx.fillRect(this.pos.x, this.pos.y, this.w, this.h);
+    /**
+     * Draws a yellow circle.
+     * This represents the reference point (origin) of the block.
+     */
+    ctx.fillStyle = 'yellow';
+    ctx.arc(this.pos.x, this.pos.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+
+/**
+ * A SpawnPlace only contains a point.
+ * This is where the player will respawn 
+ * on level load.
+ */
+class SpawnPlace extends Point{
+  constructor(x: number, y: number){
+    /**
+     * x, y - positions on X and Y axis.
+     */
+    let pos = new Vector2D(x, y);
+    super(pos, '[SpawnPlace]');
+  }
+}
+
+
 
 interface TilesOptions {
   xCount: number
@@ -442,58 +499,7 @@ class Player{
 }
 
 
-/**
- * A CollisionBlock is an abstract element where it does not 
- * get drawn onto the canvas. It only serves to check whether
- * the player or others collide with certain areas of the map.
- */
-class CollisionBlock {
-  pos: Vector2D;
-  w: number;
-  h: number;
-  constructor(x: number, y: number, w: number, h: number){
-    /**
-     * x, y - positions on X and Y axis.
-     * w, h - width and height
-     */
-    this.pos = new Vector2D(x, y);
-    this.w = w;
-    this.h = h;
-  }
-  draw(ctx: CanvasRenderingContext2D){
-    /**
-     * Draws a red rectangle with red color fill.
-     */
-    ctx.save();
-    ctx.beginPath();
-    ctx.fillStyle = 'rgba(255, 0, 0, 0.15)';
-    ctx.fillRect(this.pos.x, this.pos.y, this.w, this.h);
-    /**
-     * Draws a yellow circle.
-     * This represents the reference point (origin) of the block.
-     */
-    ctx.fillStyle = 'yellow';
-    ctx.arc(this.pos.x, this.pos.y, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-}
 
-
-/**
- * A SpawnPlace only contains a point.
- * This is where the player will respawn 
- * on level load.
- */
-class SpawnPlace extends Point{
-  constructor(x: number, y: number){
-    /**
-     * x, y - positions on X and Y axis.
-     */
-    let pos = new Vector2D(x, y);
-    super(pos, '[SpawnPlace]');
-  }
-}
 
 
 
