@@ -76,19 +76,6 @@ class Vector2D {
         return new Vector2D(this.x * scalar, this.y * scalar);
     }
 }
-const collisions = {
-    level_1: [
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 0],
-        [0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 292, 0],
-        [0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 292, 0],
-        [0, 292, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 292, 0],
-        [0, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    ]
-};
 class Sprite {
     constructor(args) {
         this.pos = new Vector2D(args.x, args.y);
@@ -108,14 +95,18 @@ class Sprite {
     }
 }
 class ActorSprite {
-    constructor(pos, src) {
+    constructor(pos, src, maxFrame) {
         this.pos = pos;
         this.currentFrame = 0;
         this.animationTimer = 80;
         this.animationCounter = 0;
-        this.maxFrame = 11;
+        this.maxFrame = maxFrame;
         this.image = new Image();
+        this.swapSprite(src, maxFrame);
+    }
+    swapSprite(src, maxFrame) {
         this.image.src = src;
+        this.maxFrame = maxFrame;
         this.image.onload = () => {
             this.loaded = true;
             this.w = this.image.width / this.maxFrame;
@@ -155,7 +146,7 @@ class Player {
         this.jumpFactor = args.jumpFactor;
         this.speedFactor = args.speedFactor;
         this.game = args.game;
-        this.sprite = new ActorSprite(this.pos, './img/king/idle.png');
+        this.sprite = new ActorSprite(this.pos, './img/king/idle.png', 11);
     }
     draw(ctx) {
         let ratio = this.sprite.w / this.width;
@@ -221,6 +212,10 @@ class Player {
                 player.pos.x + player.width >= block.pos.x &&
                 player.pos.y + player.height >= block.pos.y &&
                 player.pos.y <= block.pos.y + block.h) {
+                // Check if it is a door:
+                if (block.constructor.name == 'Door') {
+                    console.log('Hit a door');
+                }
                 if (player.vel.x < 0) {
                     player.pos.x = block.pos.x + block.w + 0.01;
                 }
@@ -265,6 +260,26 @@ class CollisionBlock {
         ctx.fill();
     }
 }
+class SpawnPlace extends CollisionBlock {
+    constructor(x, y, w, h) {
+        super(x, y, w, h);
+    }
+    draw(ctx) {
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
+        ctx.fillRect(this.pos.x, this.pos.y, this.w, this.h);
+    }
+}
+class Door extends CollisionBlock {
+    constructor(x, y, w, h) {
+        super(x, y, w, h);
+    }
+    draw(ctx) {
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(0, 0, 255, 0.3)';
+        ctx.fillRect(this.pos.x, this.pos.y, this.w, this.h);
+    }
+}
 const ONE_SECOND = 1000;
 class GameEngine {
     constructor(canvas, args) {
@@ -276,9 +291,9 @@ class GameEngine {
         this.startLevel = args.startLevel;
         this.canvas = canvas;
         this.gravity = new Vector2D(0, args.gravity);
-        this.initPlayer(args.player);
         this.initBackground();
-        this.initCollisionBlocks();
+        this.initBlocks();
+        this.initPlayer(args.player);
         // Add event listeners for key presses
         window.addEventListener('keydown', e => this.handleKeyPressed(e));
         window.addEventListener('keyup', e => this.handleKeyReleased(e));
@@ -286,6 +301,17 @@ class GameEngine {
     get LEVELS() {
         return {
             1: {
+                collisions: [
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 0],
+                    [0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 292, 0],
+                    [0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 292, 0],
+                    [0, 292, 292, 267, 0, 0, 0, 0, 0, 0, 0, 0, 290, 0, 292, 0],
+                    [0, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                ],
                 image: {
                     src: './img/backgroundLevel1.png',
                     sw: 1024,
@@ -315,14 +341,25 @@ class GameEngine {
             game: this, // add reference to game object
             ...options
         });
+        /**
+         * There should only be one spawn place per game level.
+         * Place the player on this locatoin when game starts or
+         * when player respawns.
+         */
+        this.blocks.forEach(block => {
+            if (block.constructor.name == 'SpawnPlace') {
+                this.player.pos.x = block.pos.x;
+                this.player.pos.y = block.pos.y;
+            }
+        });
     }
-    initCollisionBlocks() {
+    initBlocks() {
         this.blocks = new Array();
         // loop through the 2D array in columns and rows
         for (let col = 0; col < this.background.tiles.xCount; col++) {
             for (let row = 0; row < this.background.tiles.yCount; row++) {
                 // Get an entry value
-                let block = collisions.level_1[row][col];
+                let block = this.LEVELS[1].collisions[row][col];
                 // Calculate the ratio of the image and the canvas (makes window responsive)
                 let xRatio = this.canvas.width / this.background.imageOptions.sw;
                 let yRatio = this.canvas.height / this.background.imageOptions.sh;
@@ -334,6 +371,12 @@ class GameEngine {
                 if (block === this.background.tiles.flag) {
                     this.blocks.push(new CollisionBlock(x, y, w, h));
                 }
+                if (block === 267) {
+                    this.blocks.push(new SpawnPlace(x, y, w, h));
+                }
+                if (block === 290) {
+                    this.blocks.push(new Door(x, y, w, h));
+                }
             }
         }
     }
@@ -342,6 +385,7 @@ class GameEngine {
         const RIGHT = 'ArrowRight';
         if (e.key == RIGHT || e.key == LEFT) {
             this.player.stop();
+            this.player.sprite.swapSprite('./img/king/idle.png', 11);
         }
     }
     handleKeyPressed(e) {
@@ -354,9 +398,11 @@ class GameEngine {
         }
         if (e.key == RIGHT) {
             this.player.move(RIGHT);
+            this.player.sprite.swapSprite('./img/king/runRight.png', 8);
         }
         if (e.key == LEFT) {
             this.player.move(LEFT);
+            this.player.sprite.swapSprite('./img/king/runLeft.png', 8);
         }
         if (e.key == D) {
             this.debug.isOn = !this.debug.isOn; // toggle debug mode
