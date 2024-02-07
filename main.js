@@ -298,19 +298,37 @@ class Player {
         }
     }
 }
+/**
+ * A CollisionBlock is an abstract element where it does not
+ * get drawn onto the canvas. It only serves to check whether
+ * the player or others collide with certain areas of the map.
+ */
 class CollisionBlock {
     constructor(x, y, w, h) {
+        /**
+         * x, y - positions on X and Y axis.
+         * w, h - width and height
+         */
         this.pos = new Vector2D(x, y);
         this.w = w;
         this.h = h;
     }
     draw(ctx) {
+        /**
+         * Draws a red rectangle with red color fill.
+         */
+        ctx.save();
         ctx.beginPath();
         ctx.fillStyle = 'rgba(255, 0, 0, 0.15)';
         ctx.fillRect(this.pos.x, this.pos.y, this.w, this.h);
+        /**
+         * Draws a yellow circle.
+         * This represents the reference point (origin) of the block.
+         */
         ctx.fillStyle = 'yellow';
         ctx.arc(this.pos.x, this.pos.y, 3, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
     }
 }
 /**
