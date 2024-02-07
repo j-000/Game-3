@@ -99,7 +99,6 @@ class Vector2D {
   }
 }
 
-
 interface TilesOptions {
   xCount: number
   yCount: number
@@ -156,15 +155,14 @@ class ActorSprite {
   loaded: boolean;
   w: number;
   h: number;
-
   currentFrame: number;
   maxFrame: number;
   animationTimer: number;
   animationCounter: number;
+  r = 0;
 
   constructor(pos: Vector2D, src: string, maxFrame: number){
     this.pos = pos;
-
     this.currentFrame = 0;
     this.animationTimer = 80;
     this.animationCounter = 0;
@@ -178,29 +176,24 @@ class ActorSprite {
     this.maxFrame = maxFrame;
     this.image.onload = () => {
       this.loaded = true
-      this.w = this.image.width / this.maxFrame
-      this.h = this.image.height
+      // Width of 1 frame is the whole img / # of frames.
+      // We need to acount for responsiveness of the window.
+      this.w = (this.image.width / this.maxFrame) * GAME.xRatio;
+      // Height is unchanges as assuming spriteSheet is 
+      // 1 row only
+      this.h = this.image.height * GAME.xRatio
     };
   }
 
-  draw(ctx: CanvasRenderingContext2D){
-    let cropbox = {
+  get cropbox() {
+    return {
       position: {
         x: this.currentFrame * this.w,
-        y: 0
+        y: 0 // y is always 0 as we assume it's 1 row only
       },
       w: this.w,
-      h: this.h
+      h: this.h 
     }
-    ctx.drawImage(this.image, 
-      cropbox.position.x, 
-      cropbox.position.y,
-      cropbox.w, 
-      cropbox.h,
-      this.pos.x, 
-      this.pos.y,
-      this.w, 
-      this.h);
   }
 
   animate(deltaTime: number){
@@ -216,7 +209,26 @@ class ActorSprite {
   }
 }
 
+class Point {
+  pos: Vector2D;
+  radius: number;
+  constructor(pos: Vector2D) {
+    this.pos = pos;
+    this.radius = 5;
+  }
 
+  draw(ctx: CanvasRenderingContext2D){
+    if(!GAME.debug.isOn) return
+    ctx.save();
+    ctx.beginPath();
+    ctx.fillStyle = 'white';
+    ctx.fillText('[SpawnPlace]', this.pos.x, this.pos.y - 10)
+    ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = 'white';
+    ctx.fill();
+    ctx.restore();
+  }
+}
 
 interface PlayerOptions {
   game?: GameEngine
@@ -240,10 +252,10 @@ class Player{
   width: number;
   height: number;
   sprite: ActorSprite
-
+  r = 0;
   constructor(args: PlayerOptions) {
     this.width = args.width;
-    this.height = args.height;
+    this.height = args.height;    
     this.pos = new Vector2D(400, 200);
     this.vel = new Vector2D(0, 0);
     this.jumpFactor = args.jumpFactor;
@@ -253,29 +265,74 @@ class Player{
   }
 
   draw(ctx: CanvasRenderingContext2D) {
-    let ratio = this.sprite.w / this.width;
-    ctx.save()
-    ctx.translate(-this.sprite.w/ratio, -this.sprite.h/ratio);
-    this.sprite.draw(ctx);
-    ctx.restore()
+    /**
+     * Drawm player sprite
+     */
+    let cropbox = this.sprite.cropbox;
+    ctx.save();
+    ctx.translate(  
+      -(this.sprite.w-this.width)/2, 
+      -(this.sprite.h-this.height)/2
+    );
+    ctx.drawImage(this.sprite.image, 
+      // Get the cropped image from the whole sprite sheet
+      cropbox.position.x, 
+      cropbox.position.y,
+      (this.sprite.image.width / this.sprite.maxFrame) + this.sprite.currentFrame * (this.sprite.image.width / this.sprite.maxFrame), 
+      this.sprite.image.height, // Doesn't need update as we assume sprite sheet is 1 row only
 
+      // Draw it on the screen  
+      this.pos.x, 
+      this.pos.y, 
+      this.sprite.w, 
+      this.sprite.h
+    );
+    ctx.restore();
+
+    /**
+     * [Debug mode] 
+     * Should be drawn on top (after) sprite.
+     */
     if(this.game.debug.isOn){
-      // Player hitbox (implements collisions)
+      /**
+       * Drawm player's hitbox
+       */
       ctx.beginPath();
       ctx.strokeStyle = 'blue';
+      ctx.fillStyle = 'blue';
+      ctx.fillText('[Hitbox]', this.pos.x + 2, this.pos.y + this.height/2)
       ctx.rect(this.pos.x, this.pos.y, this.width, this.height);
       ctx.stroke();
 
-      // Image box (does not implement collisions)
-      ctx.strokeStyle = 'yellow'
-      ctx.beginPath()
+      /**
+       * Draw player's point of reference (origin)
+       */
+      ctx.fillStyle = 'white';
+      ctx.fillText('[Ref.]', this.pos.x, this.pos.y - 10);
+      ctx.beginPath();
+      ctx.strokeStyle = 'white';
+      ctx.arc(this.pos.x, this.pos.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      /**
+       * Draw player's image box (cropbox from sprite sheet)
+       */
       ctx.save();
-      ctx.translate(-this.sprite.w/ratio, -this.sprite.h/ratio);
-      ctx.rect(this.pos.x, this.pos.y, this.sprite.w, this.sprite.h);
+      ctx.beginPath();
+      // Translater image box to be centered around 
+      // the player's hitbox evenly.
+      ctx.translate(  
+        -(this.sprite.w-this.width)/2, 
+        -(this.sprite.h-this.height)/2
+      );
+      ctx.fillStyle = 'yellow';
+      ctx.fillText('[Cropbox]', this.pos.x, this.pos.y - 10)
+      ctx.strokeStyle = 'yellow';
+      ctx.rect(this.pos.x, this.pos.y, 
+      this.sprite.w, this.sprite.h);
       ctx.stroke()
       ctx.restore()
     }
-
   }
 
   update(args: PlayerUpdateOptions){
@@ -375,7 +432,7 @@ class CollisionBlock {
   }
   draw(ctx: CanvasRenderingContext2D){
     ctx.beginPath()
-    ctx.fillStyle = 'rgba(255, 0, 0, 0.3)'
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.15)'
     ctx.fillRect(this.pos.x, this.pos.y, this.w, this.h);
     ctx.fillStyle = 'yellow'
     ctx.arc(this.pos.x, this.pos.y, 3, 0, Math.PI * 2);
@@ -384,29 +441,36 @@ class CollisionBlock {
 }
 
 
-class SpawnPlace extends CollisionBlock{
-  pos: Vector2D;
-  constructor(x: number, y: number, w: number, h: number){
-    super(x, y, w, h);
-  }
-
-  draw(ctx: CanvasRenderingContext2D): void {
-    ctx.beginPath()
-    ctx.fillStyle = 'rgba(0, 255, 0, 0.3)'
-    ctx.fillRect(this.pos.x, this.pos.y, this.w, this.h);
+/**
+ * A SpawnPlace only contains a point.
+ * This is where the player will respawn 
+ * on level load.
+ */
+class SpawnPlace extends Point{
+  constructor(x: number, y: number){
+    /**
+     * x, y - positions on X and Y axis.
+     */
+    let pos = new Vector2D(x, y);
+    super(pos);
   }
 }
 
 class Door extends CollisionBlock{
   pos: Vector2D;
-  constructor(x: number, y: number, w: number, h: number){
-    super(x, y, w, h);
+  sprite: ActorSprite; 
+  constructor(x: number, y: number, w: number, h: number){   
+    super(x, y, w, h); // CollisionBlock
+    this.sprite = new ActorSprite(this.pos, './img/doorOpen.png', 5);
   }
 
   draw(ctx: CanvasRenderingContext2D): void {
+    
     ctx.beginPath()
-    ctx.fillStyle = 'rgba(0, 0, 255, 0.3)'
+    ctx.fillStyle = 'rgba(0, 0, 255, 0.15)'
     ctx.fillRect(this.pos.x, this.pos.y, this.w, this.h);
+
+
   }
 }
 
@@ -433,6 +497,9 @@ class GameEngine {
   debug: Debug
   blocks: Array<any>;
   startLevel: number;
+
+  xRatio: number;
+  yRatio: number;
 
   constructor(canvas: HTMLCanvasElement, args: GameEngineOptions) {
     this.debug = {
@@ -500,15 +567,29 @@ class GameEngine {
 
     /**
      * There should only be one spawn place per game level.
-     * Place the player on this locatoin when game starts or
+     * Place the player on this location when game starts or
      * when player respawns.
      */
     this.blocks.forEach(block => {      
       if(block.constructor.name == 'SpawnPlace'){
-        this.player.pos.x = block.pos.x;
+        /**
+         * Exact positoin is offset by half the player's width
+         * to place it on top of the point.
+         */
+        this.player.pos.x = block.pos.x - this.player.width/2;
+        /**
+         * Gravity will affect this. It's possible the player won't end up on the y-value of the point if there's a collision block.
+         */
         this.player.pos.y = block.pos.y;
       }
     })
+
+    /**
+     * Player dimensions should be responsive to the 
+     * canvas dimensions.
+     */
+    this.player.width *= this.xRatio;
+    this.player.height *= this.yRatio;
 
   }
 
@@ -520,22 +601,22 @@ class GameEngine {
         // Get an entry value
         let block = this.LEVELS[1].collisions[row][col];
         // Calculate the ratio of the image and the canvas (makes window responsive)
-        let xRatio = this.canvas.width / this.background.imageOptions.sw;
-        let yRatio = this.canvas.height / this.background.imageOptions.sh;
+        this.xRatio = this.canvas.width / this.background.imageOptions.sw;
+        this.yRatio = this.canvas.height / this.background.imageOptions.sh;
         let tileW = this.background.tiles.width;
-        let x = Math.floor(tileW * col * xRatio); // x position
-        let y = Math.floor(tileW * row * yRatio); // y position
-        let w = Math.floor(tileW * xRatio);       // w 
-        let h = Math.floor(tileW * yRatio);       // h 
+        let x = Math.floor(tileW * col * this.xRatio); // x position
+        let y = Math.floor(tileW * row * this.yRatio); // y position
+        let w = Math.floor(tileW * this.xRatio);       // w 
+        let h = Math.floor(tileW * this.yRatio);       // h 
 
         if(block === this.background.tiles.flag){
           this.blocks.push(new CollisionBlock(x, y, w, h));
         }
         if(block === 267) {
-          this.blocks.push(new SpawnPlace(x, y, w, h));
+          this.blocks.push(new SpawnPlace(x, y));
         }
         if(block === 290) {
-          this.blocks.push(new Door(x, y, w, h));
+          this.blocks.push(new Door(x, y, w, h));          
         }
 
       }
@@ -633,7 +714,17 @@ class GameEngine {
      */
     if(this.debug.isOn) {
       for(let block of this.blocks){
-        block.draw(ctx)
+        switch (block.constructor.name) {
+          case 'SpawnPlace':
+            let sp = block as SpawnPlace;
+            sp.draw(ctx);
+            break;
+          case 'Door':
+            break;
+          case 'CollisionBlock':
+            block.draw(ctx);
+            break
+        }
       }
     }
     
@@ -652,7 +743,7 @@ class GameEngine {
      * Player
      */
     this.player.draw(ctx);
-    this.player.sprite.animate(deltaTime);
+    // this.player.sprite.animate(deltaTime);
     this.player.update({
       gravity: this.gravity,
       collisionBlocks: this.blocks
@@ -700,7 +791,7 @@ function main() {
     ctx.lineWidth = 1;
 
     // Instanciate a Game instance
-    game = new GameEngine(canvas, {
+    GAME = new GameEngine(canvas, {
       scale,
       gravity: 1,
       startLevel: 1,
@@ -721,7 +812,7 @@ function main() {
       // Reset canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       // Render new frame
-      game.render(ctx, deltaTime);
+      GAME.render(ctx, deltaTime);
       // Loop
       requestAnimationFrame(animate);
     }
@@ -729,5 +820,5 @@ function main() {
     requestAnimationFrame(animate);
   })
 }
-let game: GameEngine;
+let GAME: GameEngine;
 main();
