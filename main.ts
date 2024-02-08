@@ -279,6 +279,12 @@ interface PlayerUpdateOptions {
 }
 
 
+interface ActorSpriteOptions {
+  pos: Vector2D
+  src: string
+  maxFrame: number
+  animationTimer: number
+}
 
 class ActorSprite {
   pos: Vector2D;
@@ -332,7 +338,7 @@ class ActorSprite {
   animate(deltaTime: number){
     this.animationCounter += deltaTime;
     if(this.animationCounter >= this.animationTimer){
-      if(this.currentFrame > this.maxFrame - 2) {
+      if(this.currentFrame > this.maxFrame) {
         this.currentFrame = 0;
       } else {
         this.currentFrame += 1;
@@ -364,8 +370,8 @@ class Player{
   constructor(args: PlayerOptions) {
     this.width = args.width;
     this.height = args.height;    
-    this.pos = new Vector2D(400, 200);
-    this.vel = new Vector2D(0, 0);
+    this.pos = new Vector2D(0,0);
+    this.vel = new Vector2D(0,0);
     this.jumpFactor = args.jumpFactor;
     this.speedFactor = args.speedFactor;
     this.game = args.game;
@@ -535,8 +541,6 @@ class Player{
 
 
 
-
-
 /**
  * A Door is an game actor in that it performs some animations
  * and influences game flow.
@@ -557,7 +561,7 @@ class Door extends Point{
     let frameWidth = (this.sprite.image.width / this.sprite.maxFrame);
     
     ctx.save();    
-    ctx.translate(0, -(this.sprite.h-this.radius*2)/2);
+    ctx.translate(0, (-this.sprite.h+15)/2);
     ctx.drawImage(this.sprite.image,
       /**
        * cropbox is what needs to be cropped from original image
@@ -578,25 +582,26 @@ class Door extends Point{
       this.sprite.h
     );
     ctx.restore();
-    
     /**
      * [Debug mode]
      * Draw door's point of reference
      * Draw sprite outline (cropbox)
      */
     if(GAME.debug.isOn){
-      // Point
+      /**
+       * Draw reference point (origin)
+       */
       super.draw(ctx);
-      // Cropbox
+      /**
+       * Draw door cropbox outline
+       */
       ctx.save();
-      ctx.translate(0, -(this.sprite.h-this.radius*2 -2)/2);
+      ctx.translate(0, (-this.sprite.h+15)/2);
       ctx.beginPath()
       ctx.strokeStyle = 'black';
       ctx.rect(this.pos.x, this.pos.y, this.sprite.w, this.sprite.h);
       ctx.stroke();
       ctx.restore();
-
-
     } 
   }
 }
@@ -648,20 +653,22 @@ class GameEngine {
   }
 
   get LEVELS(){
+    
     return {
       1: {
         collisions: [
-          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-          [0, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 0],
-          [0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 292, 0],
-          [0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 292, 0],
-          [0, 292, 292, 267, 0, 0, 0, 0, 0, 0, 0, 0, 290, 0, 292, 0],
-          [0, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 0],
-          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+          [292, 292, 292, 292, 292, 292, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          [292, 0, 0, 0, 0, 0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          [292, 0, 0, 0, 0, 0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          [292, 267, 292, 292, 0, 0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          [0, 0, 0, 292, 0, 0, 292, 0, 0, 292, 292, 292, 292, 292, 292, 0],
+          [0, 292, 292, 292, 0, 0, 292, 292, 292, 292, 0, 0, 0, 0, 292, 0],
+          [0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 290, 0, 292, 0],
+          [0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 292, 292, 292, 292, 0],
+          [0, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 0, 0, 0, 0]
+        ],
         image: {
-          src: './img/backgroundLevel1.png',
+          src: './img/backgroundLevel2.png',
           sw: 1024, // TODO: find a way to remove this
           sh: 576   // and this.
         },
@@ -693,19 +700,21 @@ class GameEngine {
      * Place the player on this location when game starts or
      * when player respawns.
      */
-    this.blocks.forEach(block => {      
-      if(block.constructor.name == 'SpawnPlace'){
-        /**
-         * Exact positoin is offset by half the player's width
-         * to place it on top of the point.
-         */
-        this.player.pos.x = block.pos.x - this.player.width/2;
-        /**
-         * Gravity will affect this. It's possible the player won't end up on the y-value of the point if there's a collision block.
-         */
-        this.player.pos.y = block.pos.y;
-      }
-    })
+    let block = this.blocks.find(block => block.constructor.name == 'SpawnPlace');
+    if(block){
+      /**
+       * Exact positoin is offset by half the player's width
+       * to place it on top of the point.
+       * Using a buffer to avoid the edge case where the player 
+       * spawns on the edge of a collision block.
+       */
+      let buffer = this.player.width / 2;
+      this.player.pos.x = block.pos.x + buffer
+      /**
+       * Gravity will affect this. It's possible the player won't end up on the y-value of the point if there's a collision block.
+       */
+      this.player.pos.y = block.pos.y;
+    }
 
     /**
      * Player dimensions should be responsive to the 
@@ -770,9 +779,12 @@ class GameEngine {
       this.player.move(LEFT);
       this.player.sprite.swapSprite('./img/king/runLeft.png', 8);
     }
+    /**
+     * [Debug Mode]
+     * Toggle debug mode by pressing "d"
+     */
     if (e.key == D) {
       this.debug.isOn = !this.debug.isOn // toggle debug mode
-      console.log(this);
     }
   }
 
@@ -786,6 +798,9 @@ class GameEngine {
     let hasHitLeftSide = playerSides.left <= 0;
     let hasHitUpSide = playerSides.up <= 0;
     let hasHitRightSide = playerSides.right >= this.canvas.width;
+    /**
+     * No need to check down side as applyGravity() already does it.
+     */
     let hasHitDownSide = playerSides.down + p.height >= this.canvas.height;
     if (hasHitLeftSide) {
       this.player.pos.x = 0;
@@ -839,8 +854,7 @@ class GameEngine {
         case 'Door':
           let door = block as Door;
           door.draw(ctx);
-          door.sprite.animate(deltaTime);
-          
+          // door.sprite.animate(deltaTime);
           break;
         case 'SpawnPlace':
           if(this.debug.isOn){        
@@ -876,7 +890,6 @@ class GameEngine {
       gravity: this.gravity,
       collisionBlocks: this.blocks
     })
-
 
     // Reset timer
     if (this.debug.timer > ONE_SECOND) {
