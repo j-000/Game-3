@@ -160,22 +160,46 @@ class SpawnPlace extends Point {
         super(pos, '[SpawnPlace]');
     }
 }
-class Sprite {
+/**
+ * A MapSprite represents the background sprite.
+ * Usually these don't animate.
+ */
+class MapSprite {
     constructor(args) {
-        this.pos = new Vector2D(args.x, args.y);
+        this.imageSetup = {
+            src: '',
+            sw: 0,
+            sh: 0
+        };
+        this.tiles = {
+            xCount: 0,
+            yCount: 0,
+            width: 0
+        };
+        /**
+         * pos - Vector2D of x,y position
+         * image - HTML Image Element
+         * loaded - boolean flag
+         * imageSetup - ImageSetup
+         * tiles - TilesSetup
+         */
+        this.pos = new Vector2D(0, 0);
         this.image = new Image();
-        this.image.src = args.image.src;
-        this.image.onload = () => { this.loaded = true; };
-        this.imageOptions = args.image;
+        this.image.src = args.imageSetup.src;
+        this.image.onload = () => {
+            this.loaded = true;
+        };
         this.tiles = args.tiles;
+        this.imageSetup = args.imageSetup;
     }
     draw(ctx) {
+        /**
+         * Draw the map image onto the canvas;
+         * Assumes image will cover 100% of the canvas.
+         */
         if (!this.loaded)
             return; // Skip if not loaded
-        let img = this.image;
-        let w = this.imageOptions.dw || img.width;
-        let h = this.imageOptions.dh || img.height;
-        ctx.drawImage(this.image, this.pos.x, this.pos.y, w, h);
+        ctx.drawImage(this.image, this.pos.x, this.pos.y, GAME.canvas.width, GAME.canvas.height);
     }
 }
 class ActorSprite {
@@ -327,14 +351,19 @@ class Player {
     checkCollisionXaxis(blocks) {
         let player = this;
         for (let block of blocks) {
+            // Check if it is a door:
+            if (block.constructor.name == 'Door') {
+                if (player.pos.x + player.width >= block.pos.x) {
+                    // let g = block as Door;
+                    // console.log(block);
+                    // console.log('Hit a door');
+                    break;
+                }
+            }
             if (player.pos.x <= block.pos.x + block.w &&
                 player.pos.x + player.width >= block.pos.x &&
                 player.pos.y + player.height >= block.pos.y &&
                 player.pos.y <= block.pos.y + block.h) {
-                // Check if it is a door:
-                if (block.constructor.name == 'Door') {
-                    console.log('Hit a door');
-                }
                 if (player.vel.x < 0) {
                     player.pos.x = block.pos.x + block.w + 0.01;
                 }
@@ -372,12 +401,12 @@ class Door extends Point {
     }
     draw(ctx) {
         /**
+         * [Debug mode]
          * Draw door's point of reference
          */
-        super.draw(ctx);
-        // ctx.beginPath()
-        // ctx.fillStyle = 'rgba(0, 0, 255, 0.15)'
-        // ctx.fillRect(this.pos.x, this.pos.y, this.w, this.h);
+        if (GAME.debug.isOn) {
+            super.draw(ctx);
+        }
     }
 }
 const ONE_SECOND = 1000;
@@ -414,10 +443,8 @@ class GameEngine {
                 ],
                 image: {
                     src: './img/backgroundLevel1.png',
-                    sw: 1024,
-                    sh: 576,
-                    dw: this.canvas.width,
-                    dh: this.canvas.height,
+                    sw: 1024, // TODO: find a way to remove this
+                    sh: 576 // and this.
                 },
                 tiles: {
                     xCount: 16,
@@ -429,10 +456,8 @@ class GameEngine {
         };
     }
     initBackground() {
-        this.background = new Sprite({
-            x: 0,
-            y: 0,
-            image: this.LEVELS[this.startLevel].image,
+        this.background = new MapSprite({
+            imageSetup: this.LEVELS[this.startLevel].image,
             tiles: this.LEVELS[this.startLevel].tiles
         });
     }
@@ -474,14 +499,14 @@ class GameEngine {
                 // Get an entry value
                 let block = this.LEVELS[1].collisions[row][col];
                 // Calculate the ratio of the image and the canvas (makes window responsive)
-                this.xRatio = this.canvas.width / this.background.imageOptions.sw;
-                this.yRatio = this.canvas.height / this.background.imageOptions.sh;
+                this.xRatio = this.canvas.width / this.background.imageSetup.sw;
+                this.yRatio = this.canvas.height / this.background.imageSetup.sh;
                 let tileW = this.background.tiles.width;
                 let x = Math.floor(tileW * col * this.xRatio); // x position
                 let y = Math.floor(tileW * row * this.yRatio); // y position
                 let w = Math.floor(tileW * this.xRatio); // w 
                 let h = Math.floor(tileW * this.yRatio); // h 
-                if (block === this.background.tiles.flag) {
+                if (block === 292) {
                     this.blocks.push(new CollisionBlock(x, y, w, h));
                 }
                 if (block === 267) {
