@@ -310,16 +310,18 @@ class ActorSprite {
       // Width of 1 frame is the whole img / # of frames.
       // We need to acount for responsiveness of the window.
       this.w = (this.image.width / this.maxFrame) * GAME.xRatio;
+      
       // Height is unchanges as assuming spriteSheet is 
       // 1 row only
       this.h = this.image.height * GAME.xRatio
     };
   }
 
-  get cropbox() {
+  cropbox() {
+    let frameWidth = (this.image.width / this.maxFrame);
     return {
       position: {
-        x: this.currentFrame * this.w,
+        x: this.currentFrame * frameWidth,
         y: 0 // y is always 0 as we assume it's 1 row only
       },
       w: this.w,
@@ -337,6 +339,15 @@ class ActorSprite {
         this.animationCounter = 0;
       }
     }
+  }
+
+  moveFrame(){
+    if(this.currentFrame >= this.maxFrame) {
+      this.currentFrame = 0;
+
+      return
+    }
+    this.currentFrame += 1;
   }
 }
 
@@ -365,7 +376,7 @@ class Player{
     /**
      * Draw player sprite
      */
-    let cropbox = this.sprite.cropbox;
+    let cropbox = this.sprite.cropbox();
     ctx.save();
     ctx.translate(  
       -(this.sprite.w-this.width)/2, 
@@ -542,14 +553,25 @@ class Door extends Point{
   } 
 
   draw(ctx: CanvasRenderingContext2D): void {
-    let cropbox = this.sprite.cropbox;
+    let cropbox = this.sprite.cropbox();
+    let frameWidth = (this.sprite.image.width / this.sprite.maxFrame);
+    
     ctx.save();    
-    ctx.translate(0, -(this.sprite.h-this.radius*2 -2)/2);
+    ctx.translate(0, -(this.sprite.h-this.radius*2)/2);
     ctx.drawImage(this.sprite.image,
+      /**
+       * cropbox is what needs to be cropped from original image
+       * no scalling required.
+       */
       cropbox.position.x, 
       cropbox.position.y,
-      (this.sprite.image.width / this.sprite.maxFrame) + this.sprite.currentFrame * (this.sprite.image.width / this.sprite.maxFrame), 
+      frameWidth, 
       this.sprite.image.height,
+      /**
+       * This is how the cropped image is going to be displayed.
+       * This does need to be scalled by xRatio (in this case
+       * happens in the ActorSprite class).
+       */
       this.pos.x, 
       this.pos.y, 
       this.sprite.w, 
@@ -566,10 +588,15 @@ class Door extends Point{
       // Point
       super.draw(ctx);
       // Cropbox
+      ctx.save();
+      ctx.translate(0, -(this.sprite.h-this.radius*2 -2)/2);
       ctx.beginPath()
       ctx.strokeStyle = 'black';
       ctx.rect(this.pos.x, this.pos.y, this.sprite.w, this.sprite.h);
       ctx.stroke();
+      ctx.restore();
+
+
     } 
   }
 }
@@ -603,7 +630,7 @@ class GameEngine {
 
   constructor(canvas: HTMLCanvasElement, args: GameEngineOptions) {
     this.debug = {
-      isOn: false,
+      isOn: true,
       timer: 0,
       fps: '0'
     }
@@ -809,20 +836,23 @@ class GameEngine {
      */
     for(let block of this.blocks){
       switch (block.constructor.name) {
-        case 'SpawnPlace':
-          let spawplace = block as SpawnPlace;
-          spawplace.draw(ctx);
-          break;
         case 'Door':
           let door = block as Door;
           door.draw(ctx);
+          door.sprite.animate(deltaTime);
+          
+          break;
+        case 'SpawnPlace':
+          if(this.debug.isOn){        
+            let spawplace = block as SpawnPlace;
+            spawplace.draw(ctx);
+          }
           break;
         case 'CollisionBlock':
           if(this.debug.isOn){
             block.draw(ctx);
-            break
           }
-          
+          break          
       }
     }
     

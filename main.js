@@ -224,10 +224,11 @@ class ActorSprite {
             this.h = this.image.height * GAME.xRatio;
         };
     }
-    get cropbox() {
+    cropbox() {
+        let frameWidth = (this.image.width / this.maxFrame);
         return {
             position: {
-                x: this.currentFrame * this.w,
+                x: this.currentFrame * frameWidth,
                 y: 0 // y is always 0 as we assume it's 1 row only
             },
             w: this.w,
@@ -246,6 +247,13 @@ class ActorSprite {
             }
         }
     }
+    moveFrame() {
+        if (this.currentFrame >= this.maxFrame) {
+            this.currentFrame = 0;
+            return;
+        }
+        this.currentFrame += 1;
+    }
 }
 class Player {
     constructor(args) {
@@ -263,7 +271,7 @@ class Player {
         /**
          * Draw player sprite
          */
-        let cropbox = this.sprite.cropbox;
+        let cropbox = this.sprite.cropbox();
         ctx.save();
         ctx.translate(-(this.sprite.w - this.width) / 2, -(this.sprite.h - this.height) / 2);
         ctx.drawImage(this.sprite.image, 
@@ -405,10 +413,22 @@ class Door extends Point {
         this.sprite = new ActorSprite(this.pos, './img/doorOpen.png', 5);
     }
     draw(ctx) {
-        let cropbox = this.sprite.cropbox;
+        let cropbox = this.sprite.cropbox();
+        let frameWidth = (this.sprite.image.width / this.sprite.maxFrame);
         ctx.save();
-        ctx.translate(0, -(this.sprite.h - this.radius * 2 - 2) / 2);
-        ctx.drawImage(this.sprite.image, cropbox.position.x, cropbox.position.y, (this.sprite.image.width / this.sprite.maxFrame) + this.sprite.currentFrame * (this.sprite.image.width / this.sprite.maxFrame), this.sprite.image.height, this.pos.x, this.pos.y, this.sprite.w, this.sprite.h);
+        ctx.translate(0, -(this.sprite.h - this.radius * 2) / 2);
+        ctx.drawImage(this.sprite.image, 
+        /**
+         * cropbox is what needs to be cropped from original image
+         * no scalling required.
+         */
+        cropbox.position.x, cropbox.position.y, frameWidth, this.sprite.image.height, 
+        /**
+         * This is how the cropped image is going to be displayed.
+         * This does need to be scalled by xRatio (in this case
+         * happens in the ActorSprite class).
+         */
+        this.pos.x, this.pos.y, this.sprite.w, this.sprite.h);
         ctx.restore();
         /**
          * [Debug mode]
@@ -419,10 +439,13 @@ class Door extends Point {
             // Point
             super.draw(ctx);
             // Cropbox
+            ctx.save();
+            ctx.translate(0, -(this.sprite.h - this.radius * 2 - 2) / 2);
             ctx.beginPath();
             ctx.strokeStyle = 'black';
             ctx.rect(this.pos.x, this.pos.y, this.sprite.w, this.sprite.h);
             ctx.stroke();
+            ctx.restore();
         }
     }
 }
@@ -430,7 +453,7 @@ const ONE_SECOND = 1000;
 class GameEngine {
     constructor(canvas, args) {
         this.debug = {
-            isOn: false,
+            isOn: true,
             timer: 0,
             fps: '0'
         };
@@ -621,19 +644,22 @@ class GameEngine {
          */
         for (let block of this.blocks) {
             switch (block.constructor.name) {
-                case 'SpawnPlace':
-                    let spawplace = block;
-                    spawplace.draw(ctx);
-                    break;
                 case 'Door':
                     let door = block;
                     door.draw(ctx);
+                    door.sprite.animate(deltaTime);
+                    break;
+                case 'SpawnPlace':
+                    if (this.debug.isOn) {
+                        let spawplace = block;
+                        spawplace.draw(ctx);
+                    }
                     break;
                 case 'CollisionBlock':
                     if (this.debug.isOn) {
                         block.draw(ctx);
-                        break;
                     }
+                    break;
             }
         }
         /**
