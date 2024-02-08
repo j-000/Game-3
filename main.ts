@@ -120,7 +120,7 @@ class Point {
      * name - A reference name for the point 
      */
     this.pos = pos;
-    this.radius = 5; // Default radius to 5 pixels.
+    this.radius = 4; // Default radius to 5 pixels.
     this.name = name;
   }
 
@@ -129,7 +129,6 @@ class Point {
      * Draw a white circle fill white
      * and the property name on top.
      */
-    if(!GAME.debug.isOn) return
     ctx.save();
     ctx.beginPath();
     ctx.fillStyle = 'white';
@@ -527,23 +526,51 @@ class Player{
 
 
 
-
+/**
+ * A Door is an game actor in that it performs some animations
+ * and influences game flow.
+ */
 class Door extends Point{
   sprite: ActorSprite; 
-  constructor(x: number, y: number){   
+  constructor(x: number, y: number){  
+    /**
+     * sprite - ActorSprite
+     */ 
     let pos = new Vector2D(x, y);
     super(pos, '[Door]');
     this.sprite = new ActorSprite(this.pos, './img/doorOpen.png', 5);
-  }
+  } 
 
   draw(ctx: CanvasRenderingContext2D): void {
+    let cropbox = this.sprite.cropbox;
+    ctx.save();    
+    ctx.translate(0, -(this.sprite.h-this.radius*2 -2)/2);
+    ctx.drawImage(this.sprite.image,
+      cropbox.position.x, 
+      cropbox.position.y,
+      (this.sprite.image.width / this.sprite.maxFrame) + this.sprite.currentFrame * (this.sprite.image.width / this.sprite.maxFrame), 
+      this.sprite.image.height,
+      this.pos.x, 
+      this.pos.y, 
+      this.sprite.w, 
+      this.sprite.h
+    );
+    ctx.restore();
+    
     /**
      * [Debug mode]
      * Draw door's point of reference
+     * Draw sprite outline (cropbox)
      */
     if(GAME.debug.isOn){
+      // Point
       super.draw(ctx);
-    }
+      // Cropbox
+      ctx.beginPath()
+      ctx.strokeStyle = 'black';
+      ctx.rect(this.pos.x, this.pos.y, this.sprite.w, this.sprite.h);
+      ctx.stroke();
+    } 
   }
 }
 
@@ -576,7 +603,7 @@ class GameEngine {
 
   constructor(canvas: HTMLCanvasElement, args: GameEngineOptions) {
     this.debug = {
-      isOn: true,
+      isOn: false,
       timer: 0,
       fps: '0'
     }
@@ -780,21 +807,22 @@ class GameEngine {
      * Drawing only needs to happen in debug mode. 
      * Checkign for collisions doesn't require drawing them.
      */
-    if(this.debug.isOn) {
-      for(let block of this.blocks){
-        switch (block.constructor.name) {
-          case 'SpawnPlace':
-            let spawplace = block as SpawnPlace;
-            spawplace.draw(ctx);
-            break;
-          case 'Door':
-            let door = block as Door;
-            door.draw(ctx);
-            break;
-          case 'CollisionBlock':
+    for(let block of this.blocks){
+      switch (block.constructor.name) {
+        case 'SpawnPlace':
+          let spawplace = block as SpawnPlace;
+          spawplace.draw(ctx);
+          break;
+        case 'Door':
+          let door = block as Door;
+          door.draw(ctx);
+          break;
+        case 'CollisionBlock':
+          if(this.debug.isOn){
             block.draw(ctx);
             break
-        }
+          }
+          
       }
     }
     
