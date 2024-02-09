@@ -296,7 +296,6 @@ class ActorSprite {
   maxFrame: number;
   animationTimer: number;
   animationCounter: number;
-  r = 0;
 
   constructor(pos: Vector2D, src: string, maxFrame: number){
     this.pos = pos;
@@ -336,24 +335,34 @@ class ActorSprite {
   }
 
   animate(deltaTime: number){
+    /**
+     * Add the deltaTime to the animaton counter.
+     * deltaTime - time it takes for 1 frame to be rendered.
+     * At 60 fps/hz ~ 16.7 ms.
+     */
     this.animationCounter += deltaTime;
+    /**
+     * If the timer is ready, moveFrame().
+     */
     if(this.animationCounter >= this.animationTimer){
-      if(this.currentFrame > this.maxFrame) {
-        this.currentFrame = 0;
-      } else {
-        this.currentFrame += 1;
-        this.animationCounter = 0;
-      }
+      this.moveFrame();
     }
   }
 
   moveFrame(){
-    if(this.currentFrame >= this.maxFrame) {
+    /**
+     * Frames are 0-indexed, so we must account for this
+     * by subtracting 1 from the maxFrame condition
+     */
+    if(this.currentFrame >= this.maxFrame - 1) {
       this.currentFrame = 0;
-
-      return
+    } else {
+      this.currentFrame += 1;
+      /**
+       * Reset the animation counter for next loop
+       */
+      this.animationCounter = 0
     }
-    this.currentFrame += 1;
   }
 }
 
@@ -378,12 +387,14 @@ class Player{
     this.sprite = new ActorSprite(this.pos, './img/king/idle.png', 11);
   }
 
-  draw(ctx: CanvasRenderingContext2D) {
+  draw(ctx: CanvasRenderingContext2D) {    
     /**
      * Draw player sprite
      */
-    let cropbox = this.sprite.cropbox();
+    let cropbox = this.sprite.cropbox();    
+    let frameWidth = this.sprite.image.width / this.sprite.maxFrame;
     ctx.save();
+    // Align image with player's reference point
     ctx.translate(  
       -(this.sprite.w-this.width)/2, 
       -(this.sprite.h-this.height)/2
@@ -392,9 +403,8 @@ class Player{
       // Get the cropped image from the whole sprite sheet
       cropbox.position.x, 
       cropbox.position.y,
-      (this.sprite.image.width / this.sprite.maxFrame) + this.sprite.currentFrame * (this.sprite.image.width / this.sprite.maxFrame), 
+      frameWidth,
       this.sprite.image.height, // Doesn't need update as we assume sprite sheet is 1 row only
-
       // Draw it on the screen  
       this.pos.x, 
       this.pos.y, 
@@ -489,15 +499,14 @@ class Player{
   checkCollisionXaxis(blocks: Array<CollisionBlock>){
     let player = this;
     for(let block of blocks){
-      // Check if it is a door:
+      // check if it is a door! // [ ] player entering door logic
       if(block.constructor.name == 'Door'){
         if(player.pos.x + player.width >= block.pos.x
           ){
             // let g = block as Door;
             // console.log(block);
-            
             // console.log('Hit a door');
-            break
+            // don't use break otherwise below logic won't run!
         }
       }
 
@@ -559,7 +568,6 @@ class Door extends Point{
   draw(ctx: CanvasRenderingContext2D): void {
     let cropbox = this.sprite.cropbox();
     let frameWidth = (this.sprite.image.width / this.sprite.maxFrame);
-    
     ctx.save();    
     ctx.translate(0, (-this.sprite.h+15)/2);
     ctx.drawImage(this.sprite.image,
@@ -657,19 +665,19 @@ class GameEngine {
     return {
       1: {
         collisions: [
-          [292, 292, 292, 292, 292, 292, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-          [292, 0, 0, 0, 0, 0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-          [292, 0, 0, 0, 0, 0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-          [292, 267, 292, 292, 0, 0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-          [0, 0, 0, 292, 0, 0, 292, 0, 0, 292, 292, 292, 292, 292, 292, 0],
-          [0, 292, 292, 292, 0, 0, 292, 292, 292, 292, 0, 0, 0, 0, 292, 0],
-          [0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 290, 0, 292, 0],
-          [0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 292, 292, 292, 292, 0],
-          [0, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 0, 0, 0, 0]
+          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          [0, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 0],
+          [0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 292, 0],
+          [0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 292, 0],
+          [0, 292, 292, 267, 0, 0, 0, 0, 0, 0, 0, 0, 290, 0, 292, 0],
+          [0, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 292, 0],
+          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         ],
         image: {
-          src: './img/backgroundLevel2.png',
-          sw: 1024, // TODO: find a way to remove this
+          src: './img/backgroundLevel1.png',
+          sw: 1024, // [ ] find a way to remove this
           sh: 576   // and this.
         },
         tiles: {
@@ -755,11 +763,16 @@ class GameEngine {
   }
 
   handleKeyReleased(e: KeyboardEvent) {
+    /**
+     * If user releases left/right arrow key
+     * stop the player from moving and
+     * set the sprite back to idle.
+     */
     const LEFT = 'ArrowLeft';
     const RIGHT = 'ArrowRight';
     if (e.key == RIGHT || e.key == LEFT) {
       this.player.stop();
-      this.player.sprite.swapSprite('./img/king/idle.png', 11);
+      this.player.sprite.swapSprite('./img/king/idle.png', 11); // [ ] #3 remove harcoded info to a config file instead
     }
   }
 
@@ -773,11 +786,11 @@ class GameEngine {
     }
     if (e.key == RIGHT) {
       this.player.move(RIGHT);
-      this.player.sprite.swapSprite('./img/king/runRight.png', 8);
+      this.player.sprite.swapSprite('./img/king/runRight.png', 8); // [ ] #3
     }
     if (e.key == LEFT) {
       this.player.move(LEFT);
-      this.player.sprite.swapSprite('./img/king/runLeft.png', 8);
+      this.player.sprite.swapSprite('./img/king/runLeft.png', 8); // [ ] #3
     }
     /**
      * [Debug Mode]
@@ -885,7 +898,7 @@ class GameEngine {
      * Player
      */
     this.player.draw(ctx);
-    // this.player.sprite.animate(deltaTime);
+    this.player.sprite.animate(deltaTime);
     this.player.update({
       gravity: this.gravity,
       collisionBlocks: this.blocks
@@ -903,7 +916,7 @@ class GameEngine {
 function main() {
   // Once all HTML and images are loaded
   window.addEventListener('load', () => {
-    let scale = 0.8;
+    let scale = 0.9;
     const canvas = document.getElementById('canvas') as HTMLCanvasElement;
     // Get the browser window dimensions (not more than 80%)
     const windowWidth = window.innerWidth * scale;

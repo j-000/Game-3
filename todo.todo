@@ -5,8 +5,8 @@
 [x] Background sprite
 [x] Collision blocks
 [x] Collision detection
-[x] Sprite animation
 [x] Hitbox implementation
+[x] Sprite animation
 [ ] Sprite swapping
 [ ] Entering doors
 [ ] Changing levels
