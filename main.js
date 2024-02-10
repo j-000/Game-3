@@ -207,14 +207,16 @@ class MapSprite {
  * due to custom configurations needed for Parent class.
  */
 class ActorSprite {
-    constructor(pos, img) {
+    constructor(pos, img, scale = 1) {
         this.pos = pos;
+        this.scale = scale;
         this.currentFrame = 0;
-        this.animationTimer = 80;
+        this.animationTimer = 90;
         this.animationCounter = 0;
         this.maxFrame = Number(img.getAttribute('maxFrames'));
         this.image = img;
         this.updateDimensions();
+        this.updateAnimationDuration(this.image);
     }
     updateDimensions() {
         /**
@@ -224,12 +226,18 @@ class ActorSprite {
          * player's hitbox.
          */
         // Width of 1 frame is the whole img / # of frames.
-        this.w = (this.image.width / this.maxFrame) * GAME.xRatio;
+        this.w = (this.image.width / this.maxFrame) * GAME.xRatio * this.scale;
         /**
          * Height is taken from the image and only scaled by the game's yRatio.
          * It is assumed sprite sheets only contain 1 row.
          */
-        this.h = this.image.height * GAME.yRatio;
+        this.h = this.image.height * GAME.yRatio * this.scale;
+    }
+    updateAnimationDuration(img) {
+        let duration = img.getAttribute('duration');
+        if (duration) {
+            this.animationTimer = Number(duration);
+        }
     }
     swapSprite(img) {
         /**
@@ -238,6 +246,7 @@ class ActorSprite {
          */
         this.image = img;
         this.maxFrame = Number(this.image.getAttribute('maxFrames'));
+        this.updateAnimationDuration(img);
     }
     cropbox() {
         /**
@@ -288,6 +297,7 @@ class ActorSprite {
 }
 class Player {
     constructor(args) {
+        this.lives = 3;
         this.width = args.width;
         this.height = args.height;
         this.pos = new Vector2D(0, 0);
@@ -295,13 +305,16 @@ class Player {
         this.jumpFactor = args.jumpFactor;
         this.speedFactor = args.speedFactor;
         this.game = args.game;
+        this.direction = 'right';
         this.player_images = {
-            idle: document.getElementById('player_idle'),
+            idle_right: document.getElementById('player_idle_right'), // [ ] refactor repeating remove type 
+            idle_left: document.getElementById('player_idle_left'), // [ ] refactor repeating remove type 
             runLeft: document.getElementById('player_runleft'),
             runRight: document.getElementById('player_runright'),
-            enterDoor: document.getElementById('player_enterdoor')
+            enterDoor: document.getElementById('player_enterdoor'),
+            attack: document.getElementById('player_attack')
         };
-        this.sprite = new ActorSprite(this.pos, this.player_images.idle);
+        this.sprite = new ActorSprite(this.pos, this.player_images.idle_right);
     }
     draw(ctx) {
         /**
@@ -421,15 +434,28 @@ class Player {
     stop() {
         this.vel = this.vel.multiply(0);
     }
+    animate(deltaTime) {
+        this.sprite.animate(deltaTime);
+    }
     move(direction) {
         switch (direction) {
             case 'ArrowLeft':
                 this.vel.x = -this.speedFactor;
+                this.sprite.swapSprite(this.player_images.runLeft);
+                this.direction = 'left';
                 break;
             case 'ArrowRight':
                 this.vel.x = this.speedFactor;
+                this.sprite.swapSprite(this.player_images.runRight);
+                this.direction = 'right';
                 break;
         }
+    }
+    enterDoor() {
+        this.sprite.swapSprite(this.player_images.enterDoor);
+    }
+    attack() {
+        this.sprite.swapSprite(this.player_images.attack);
     }
     jump() {
         if (this.vel.y == 0) {
@@ -448,8 +474,17 @@ class Door extends Point {
          */
         let pos = new Vector2D(x, y);
         super(pos, '[Door]');
-        let door_image = document.getElementById('door');
+        let door_image = document.getElementById('doorOpen');
         this.sprite = new ActorSprite(this.pos, door_image);
+        this.open = false;
+    }
+    animate(deltaTime) {
+        if (this.open) {
+            this.sprite.animate(deltaTime);
+        }
+        else {
+            this.sprite.currentFrame = 0;
+        }
     }
     draw(ctx) {
         let cropbox = this.sprite.cropbox();
@@ -493,6 +528,46 @@ class Door extends Point {
     }
 }
 const ONE_SECOND = 1000;
+/**
+ * Extending the Array class with a custom function
+ * to find an item by its constructor name.
+ */
+class List extends Array {
+    constructor() {
+        super();
+    }
+    findByConstructorName(name) {
+        return super.find(i => i.constructor.name === name);
+    }
+}
+class Heart {
+    constructor(pos) {
+        let img = document.getElementById('heart_idle');
+        this.pos = pos;
+        this.sprite = new ActorSprite(this.pos, img, 2.5);
+    }
+    animate(deltaTime) {
+        this.sprite.animate(deltaTime);
+    }
+    draw(ctx) {
+        let cropbox = this.sprite.cropbox();
+        let frameWidth = (this.sprite.image.width / this.sprite.maxFrame);
+        ctx.save();
+        ctx.drawImage(this.sprite.image, 
+        /**
+         * cropbox is what needs to be cropped from original image
+         * no scalling required.
+         */
+        cropbox.position.x, cropbox.position.y, frameWidth, this.sprite.image.height, 
+        /**
+         * This is how the cropped image is going to be displayed.
+         * This does need to be scalled by xRatio (in this case
+         * happens in the ActorSprite class).
+         */
+        this.pos.x + 22, this.pos.y + 20, this.sprite.w, this.sprite.h);
+        ctx.restore();
+    }
+}
 class GameEngine {
     constructor(canvas, args) {
         this.debug = {
@@ -515,6 +590,13 @@ class GameEngine {
     start(args) {
         this.initBlocks();
         this.initPlayer(args);
+        this.initHearts();
+    }
+    initHearts() {
+        // Create Hearts
+        for (let i = 0; i < this.player.lives; i++) {
+            this.blocks.push(new Heart(new Vector2D((22 * i), 0)));
+        }
     }
     get LEVELS() {
         return {
@@ -560,7 +642,7 @@ class GameEngine {
          * Place the player on this location when game starts or
          * when player respawns.
          */
-        let block = this.blocks.find(block => block.constructor.name == 'SpawnPlace');
+        let block = this.blocks.findByConstructorName('SpawnPlace');
         if (block) {
             /**
              * Exact positoin is offset by half the player's width
@@ -583,7 +665,7 @@ class GameEngine {
         this.player.height *= this.yRatio;
     }
     initBlocks() {
-        this.blocks = new Array();
+        this.blocks = new List();
         // loop through the 2D array in columns and rows
         for (let col = 0; col < this.background.tiles.xCount; col++) {
             for (let row = 0; row < this.background.tiles.yCount; row++) {
@@ -612,35 +694,54 @@ class GameEngine {
          * stop the player from moving and
          * set the sprite back to idle.
          */
-        const LEFT = 'ArrowLeft';
-        const RIGHT = 'ArrowRight';
-        if (e.key == RIGHT || e.key == LEFT) {
+        let released = [
+            'ArrowRight', 'ArrowLeft', 'ArrowUp', 'a'
+        ].find(s => s == e.key);
+        if (released) {
             this.player.stop();
-            this.player.sprite.swapSprite(this.player.player_images.idle);
+            if (this.player.direction == 'left') {
+                this.player.sprite.swapSprite(this.player.player_images.idle_left);
+            }
+            else {
+                this.player.sprite.swapSprite(this.player.player_images.idle_right);
+            }
+            if (e.key == 'ArrowUp') {
+                let door = this.blocks.findByConstructorName('Door');
+                door.open = false;
+            }
         }
     }
     handleKeyPressed(e) {
-        const SPACE = ' ';
-        const LEFT = 'ArrowLeft';
-        const RIGHT = 'ArrowRight';
-        const D = 'd';
-        if (e.key == SPACE) {
-            this.player.jump();
-        }
-        if (e.key == RIGHT) {
-            this.player.move(RIGHT);
-            this.player.sprite.swapSprite(this.player.player_images.runRight); // [ ] #3
-        }
-        if (e.key == LEFT) {
-            this.player.move(LEFT);
-            this.player.sprite.swapSprite(this.player.player_images.runLeft); // [ ] #3
-        }
-        /**
-         * [Debug Mode]
-         * Toggle debug mode by pressing "d"
-         */
-        if (e.key == D) {
-            this.debug.isOn = !this.debug.isOn; // toggle debug mode
+        switch (e.key) {
+            case ' ':
+                this.player.jump();
+                break;
+            case 'ArrowLeft':
+                this.player.move('ArrowLeft');
+                break;
+            case 'ArrowRight':
+                this.player.move('ArrowRight');
+                break;
+            case 'ArrowUp':
+                let door = this.blocks.findByConstructorName('Door');
+                if (door) {
+                    let distanceToDoor = this.player.pos.distanceTo(door.pos);
+                    if (this.player.pos.x >= door.pos.x && distanceToDoor < this.player.width) {
+                        door.open = true;
+                        this.player.enterDoor();
+                    }
+                }
+                break;
+            case 'a':
+                this.player.attack();
+                break;
+            /**
+             * [Debug Mode]
+             * Toggle debug mode by pressing "d"
+             */
+            case 'd':
+                this.debug.isOn = !this.debug.isOn;
+                break;
         }
     }
     checkCanvasCollision(p) {
@@ -696,6 +797,15 @@ class GameEngine {
          */
         this.background.draw(ctx);
         /**
+         * Extras:
+         * Lives bar
+         */
+        ctx.save();
+        let lives_bar = document.getElementById('lives_bar');
+        let scale = 2;
+        ctx.drawImage(lives_bar, 0, 0, lives_bar.width * scale, lives_bar.height * scale);
+        ctx.restore();
+        /**
          * [Debug mode]
          * Collision blocks
          * Drawing only needs to happen in debug mode.
@@ -707,8 +817,12 @@ class GameEngine {
                     case 'Door':
                         let door = block;
                         door.draw(ctx);
-                        // door.sprite.animate(deltaTime);
+                        door.animate(deltaTime);
                         break;
+                    case 'Heart':
+                        let heart = block;
+                        heart.draw(ctx);
+                        heart.animate(deltaTime);
                     case 'SpawnPlace':
                         if (this.debug.isOn) {
                             let spawplace = block;
@@ -738,7 +852,7 @@ class GameEngine {
          */
         if (this.player) {
             this.player.draw(ctx);
-            this.player.sprite.animate(deltaTime);
+            this.player.animate(deltaTime);
             this.player.update({
                 gravity: this.gravity,
                 collisionBlocks: this.blocks

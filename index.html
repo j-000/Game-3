@@ -11,11 +11,17 @@
 </head>
 <body>
     <header style="display: none;">
+        <img src="./img/decor/liveBar.png" id="lives_bar" maxFrames="1">
+        <img src="./img/decor/heartIdle.png" id="heart_idle" maxFrames="8">
+        
         <img src="./img/king/runLeft.png" id="player_runleft" maxFrames="8">
         <img src="./img/king/runRight.png" id="player_runright" maxFrames="8">
-        <img src="./img/king/enterDoor.png" id="player_enterdoor" maxFrames="8">
-        <img src="./img/king/idle.png" id="player_idle" maxFrames="11">
-        <img src="./img/doorOpen.png" id="door" maxFrames="5">
+        <img src="./img/king/enterDoor.png" id="player_enterdoor" maxFrames="8" duration="120">
+        <img src="./img/king/attack.png" id="player_attack" maxFrames="3" duration="120">
+        <img src="./img/king/idleRight.png" id="player_idle_right" maxFrames="11">
+        <img src="./img/king/idleLeft.png" id="player_idle_left" maxFrames="11">
+        
+        <img src="./img/door/doorOpen.png" id="doorOpen" maxFrames="5" duration="150">
     </header>
     <main>
         <canvas id="canvas"></canvas>
