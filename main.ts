@@ -225,7 +225,7 @@ class MapSprite {
     this.pos = new Vector2D(0, 0);
     this.image = new Image();
     this.image.src = args.imageSetup.src;
-    this.image.onload = () => {
+    this.image.onload = () => { // FIXME: remove this to use <img> html
       this.loaded = true;
     };
     this.tiles = args.tiles;
@@ -248,48 +248,15 @@ class MapSprite {
 }
 
 
-
 /**
- * Interfaces for some
+ * ActorSprite manages a charater's srite sheet
+ * animation and swapping.
+ * Draw method should be implemented in the Parent class
+ * due to custom configurations needed for Parent class.
  */
-interface ImageSetup {
-  src: string;
-  sw: number;
-  sh: number;
-}
-interface TilesSetup {
-  xCount: number
-  yCount: number
-  width: number // assuming squares only
-}
-interface MapSpriteOptions {
-  imageSetup: ImageSetup
-  tiles: TilesSetup
-}
-interface PlayerOptions {
-  game?: GameEngine
-  width: number
-  height: number
-  jumpFactor: number
-  speedFactor: number
-}
-interface PlayerUpdateOptions {
-  gravity: Vector2D
-  collisionBlocks: Array<CollisionBlock>
-}
-
-
-interface ActorSpriteOptions {
-  pos: Vector2D
-  src: string
-  maxFrame: number
-  animationTimer: number
-}
-
 class ActorSprite {
   pos: Vector2D;
   image: HTMLImageElement;
-  loaded: boolean;
   w: number;
   h: number;
   currentFrame: number;
@@ -297,37 +264,52 @@ class ActorSprite {
   animationTimer: number;
   animationCounter: number;
 
-  constructor(pos: Vector2D, src: string, maxFrame: number){
+  constructor(pos: Vector2D, img: HTMLImageElement){
     this.pos = pos;
     this.currentFrame = 0;
     this.animationTimer = 80;
     this.animationCounter = 0;
-    this.maxFrame = maxFrame;
-    this.image = new Image();
-    this.swapSprite(src, maxFrame);
+    this.maxFrame = Number(img.getAttribute('maxFrames'));
+    this.image = img;
+    this.updateDimensions();
   }
 
-  swapSprite(src: string, maxFrame: number){
-    this.image.src = src;
-    this.maxFrame = maxFrame;
-    this.image.onload = () => {
-      this.loaded = true
-      // Width of 1 frame is the whole img / # of frames.
-      // We need to acount for responsiveness of the window.
-      this.w = (this.image.width / this.maxFrame) * GAME.xRatio;
-      
-      // Height is unchanges as assuming spriteSheet is 
-      // 1 row only
-      this.h = this.image.height * GAME.xRatio
-    };
+  updateDimensions() {
+    /**
+     * Update the dimensions of the sprite considering the
+     * new image and the xRatio to make it responsive.
+     * w and h are used to draw the player sprite image correctly inside the 
+     * player's hitbox.
+     */
+    // Width of 1 frame is the whole img / # of frames.
+    this.w = (this.image.width / this.maxFrame) * GAME.xRatio;
+    /**
+     * Height is taken from the image and only scaled by the game's yRatio.
+     * It is assumed sprite sheets only contain 1 row.
+     */
+    this.h = this.image.height * GAME.yRatio;
+  }
+
+  swapSprite(img: HTMLImageElement){ 
+    /**
+     * Swap the current Image element with the new reference provided.
+     * img (args) should be already loaded. 
+     */    
+    this.image = img;
+    this.maxFrame = Number(this.image.getAttribute('maxFrames'));
   }
 
   cropbox() {
+    /**
+     * Build cropbox used in draw method of Parent class.
+     * This crop box will return dimensions and a point to 
+     * crop the sprite sheet. Used in ctx.drawImage 9-args version.
+     */
     let frameWidth = (this.image.width / this.maxFrame);
     return {
       position: {
         x: this.currentFrame * frameWidth,
-        y: 0 // y is always 0 as we assume it's 1 row only
+        y: 0 // y is always 0 as we assume sprite sheets ar 1 row only
       },
       w: this.w,
       h: this.h 
@@ -366,6 +348,44 @@ class ActorSprite {
   }
 }
 
+
+/**
+ * Interfaces for some
+ */
+interface ImageSetup {
+  src: string;
+  sw: number;
+  sh: number;
+}
+interface TilesSetup {
+  xCount: number
+  yCount: number
+  width: number // assuming squares only
+}
+interface MapSpriteOptions {
+  imageSetup: ImageSetup
+  tiles: TilesSetup
+}
+interface PlayerOptions {
+  game?: GameEngine
+  width: number
+  height: number
+  jumpFactor: number
+  speedFactor: number
+}
+interface PlayerUpdateOptions {
+  gravity: Vector2D
+  collisionBlocks: Array<CollisionBlock>
+}
+interface ActorSpriteOptions {
+  pos: Vector2D
+  src: string
+  maxFrame: number
+  animationTimer: number
+}
+
+
+
 class Player{
   game: GameEngine;
   jumpFactor: number;
@@ -375,7 +395,8 @@ class Player{
   width: number;
   height: number;
   sprite: ActorSprite
-  r = 0;
+  player_images: any // FIXME no anys!
+
   constructor(args: PlayerOptions) {
     this.width = args.width;
     this.height = args.height;    
@@ -384,7 +405,13 @@ class Player{
     this.jumpFactor = args.jumpFactor;
     this.speedFactor = args.speedFactor;
     this.game = args.game;
-    this.sprite = new ActorSprite(this.pos, './img/king/idle.png', 11);
+    this.player_images = {
+      idle: document.getElementById('player_idle') as HTMLImageElement,
+      runLeft: document.getElementById('player_runleft') as HTMLImageElement,
+      runRight: document.getElementById('player_runright') as HTMLImageElement,
+      enterDoor: document.getElementById('player_enterdoor') as HTMLImageElement
+    }
+    this.sprite = new ActorSprite(this.pos, this.player_images.idle);
   }
 
   draw(ctx: CanvasRenderingContext2D) {    
@@ -562,7 +589,8 @@ class Door extends Point{
      */ 
     let pos = new Vector2D(x, y);
     super(pos, '[Door]');
-    this.sprite = new ActorSprite(this.pos, './img/doorOpen.png', 5);
+    let door_image = document.getElementById('door') as HTMLImageElement;
+    this.sprite = new ActorSprite(this.pos, door_image);
   } 
 
   draw(ctx: CanvasRenderingContext2D): void {
@@ -617,7 +645,7 @@ class Door extends Point{
 interface GameEngineOptions {
   gravity: number
   scale?: number
-  player: PlayerOptions
+  player?: PlayerOptions
   startLevel: number
 }
 
@@ -635,9 +663,9 @@ class GameEngine {
   player: Player;
   background: MapSprite;
   debug: Debug
-  blocks: Array<any>;
+  blocks: Array<any>; // [ ] no anys
   startLevel: number;
-
+  currentLevel: number;
   xRatio: number;
   yRatio: number;
 
@@ -647,17 +675,22 @@ class GameEngine {
       timer: 0,
       fps: '0'
     }
+    this.currentLevel = 1;
     this.startLevel = args.startLevel;
     this.canvas = canvas;
     this.gravity = new Vector2D(0, args.gravity);
-
+    // Calculate the ratio of the image and the canvas (makes window responsive)
     this.initBackground();
-    this.initBlocks();
-    this.initPlayer(args.player);
-
+    this.xRatio = this.canvas.width / this.background.imageSetup.sw;
+    this.yRatio = this.canvas.height / this.background.imageSetup.sh;
     // Add event listeners for key presses
     window.addEventListener('keydown', e => this.handleKeyPressed(e));
     window.addEventListener('keyup', e => this.handleKeyReleased(e));
+  }
+
+  start(args: PlayerOptions){
+    this.initBlocks();
+    this.initPlayer(args);
   }
 
   get LEVELS(){
@@ -738,16 +771,12 @@ class GameEngine {
     for(let col = 0; col < this.background.tiles.xCount; col++){
       for(let row = 0; row < this.background.tiles.yCount; row++){
         // Get an entry value
-        let block = this.LEVELS[1].collisions[row][col];
-        // Calculate the ratio of the image and the canvas (makes window responsive)
-        this.xRatio = this.canvas.width / this.background.imageSetup.sw;
-        this.yRatio = this.canvas.height / this.background.imageSetup.sh;
+        let block = this.LEVELS[this.currentLevel].collisions[row][col];
         let tileW = this.background.tiles.width;
         let x = Math.floor(tileW * col * this.xRatio); // x position
         let y = Math.floor(tileW * row * this.yRatio); // y position
         let w = Math.floor(tileW * this.xRatio);       // w 
         let h = Math.floor(tileW * this.yRatio);       // h 
-
         if(block === 292){
           this.blocks.push(new CollisionBlock(x, y, w, h));
         }
@@ -757,7 +786,6 @@ class GameEngine {
         if(block === 290) {
           this.blocks.push(new Door(x, y));          
         }
-
       }
     }
   }
@@ -772,7 +800,7 @@ class GameEngine {
     const RIGHT = 'ArrowRight';
     if (e.key == RIGHT || e.key == LEFT) {
       this.player.stop();
-      this.player.sprite.swapSprite('./img/king/idle.png', 11); // [ ] #3 remove harcoded info to a config file instead
+      this.player.sprite.swapSprite(this.player.player_images.idle);
     }
   }
 
@@ -786,11 +814,11 @@ class GameEngine {
     }
     if (e.key == RIGHT) {
       this.player.move(RIGHT);
-      this.player.sprite.swapSprite('./img/king/runRight.png', 8); // [ ] #3
+      this.player.sprite.swapSprite(this.player.player_images.runRight); // [ ] #3
     }
     if (e.key == LEFT) {
       this.player.move(LEFT);
-      this.player.sprite.swapSprite('./img/king/runLeft.png', 8); // [ ] #3
+      this.player.sprite.swapSprite(this.player.player_images.runLeft); // [ ] #3
     }
     /**
      * [Debug Mode]
@@ -862,27 +890,28 @@ class GameEngine {
      * Drawing only needs to happen in debug mode. 
      * Checkign for collisions doesn't require drawing them.
      */
-    for(let block of this.blocks){
-      switch (block.constructor.name) {
-        case 'Door':
-          let door = block as Door;
-          door.draw(ctx);
-          // door.sprite.animate(deltaTime);
-          break;
-        case 'SpawnPlace':
-          if(this.debug.isOn){        
-            let spawplace = block as SpawnPlace;
-            spawplace.draw(ctx);
-          }
-          break;
-        case 'CollisionBlock':
-          if(this.debug.isOn){
-            block.draw(ctx);
-          }
-          break          
+    if(this.blocks){
+      for(let block of this.blocks){
+        switch (block.constructor.name) {
+          case 'Door':
+            let door = block as Door;
+            door.draw(ctx);
+            // door.sprite.animate(deltaTime);
+            break;
+          case 'SpawnPlace':
+            if(this.debug.isOn){        
+              let spawplace = block as SpawnPlace;
+              spawplace.draw(ctx);
+            }
+            break;
+          case 'CollisionBlock':
+            if(this.debug.isOn){
+              block.draw(ctx);
+            }
+            break          
+        }
       }
-    }
-    
+    }    
     /**
      * [Debug mode]
      * Draw FPS indicator; Updates every second.
@@ -897,12 +926,14 @@ class GameEngine {
     /**
      * Player
      */
-    this.player.draw(ctx);
-    this.player.sprite.animate(deltaTime);
-    this.player.update({
-      gravity: this.gravity,
-      collisionBlocks: this.blocks
-    })
+    if(this.player){
+      this.player.draw(ctx);
+      this.player.sprite.animate(deltaTime);
+      this.player.update({
+        gravity: this.gravity,
+        collisionBlocks: this.blocks
+      })
+    }
 
     // Reset timer
     if (this.debug.timer > ONE_SECOND) {
@@ -912,67 +943,65 @@ class GameEngine {
   }
 }
 
+let GAME: GameEngine;
+// Once all HTML and images are loaded
+window.addEventListener('load', () => {
+  let scale = 0.9;
+  const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+  // Get the browser window dimensions (not more than 80%)
+  const windowWidth = window.innerWidth * scale;
+  const windowHeight = window.innerHeight * scale;
+  const aspectRatio = 16 / 9;
 
-function main() {
-  // Once all HTML and images are loaded
-  window.addEventListener('load', () => {
-    let scale = 0.9;
-    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-    // Get the browser window dimensions (not more than 80%)
-    const windowWidth = window.innerWidth * scale;
-    const windowHeight = window.innerHeight * scale;
-    const aspectRatio = 16 / 9;
+  // Calculate the maximum dimensions while maintaining the aspect ratio
+  let canvasWidth: number, canvasHeight: number;
+  if (windowWidth / windowHeight > aspectRatio) {
+    // If window is wider than the aspect ratio
+    canvasWidth = windowHeight * aspectRatio;
+    canvasHeight = windowHeight;
+  } else {
+    // If window is taller than the aspect ratio
+    canvasWidth = windowWidth;
+    canvasHeight = windowWidth / aspectRatio;
+  }
 
-    // Calculate the maximum dimensions while maintaining the aspect ratio
-    let canvasWidth: number, canvasHeight: number;
-    if (windowWidth / windowHeight > aspectRatio) {
-      // If window is wider than the aspect ratio
-      canvasWidth = windowHeight * aspectRatio;
-      canvasHeight = windowHeight;
-    } else {
-      // If window is taller than the aspect ratio
-      canvasWidth = windowWidth;
-      canvasHeight = windowWidth / aspectRatio;
-    }
+  // Set the canvas dimensions
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
 
-    // Set the canvas dimensions
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
+  // Get canvas context and set some global defaults
+  const ctx = canvas.getContext("2d");
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = 1;
 
-    // Get canvas context and set some global defaults
-    const ctx = canvas.getContext("2d");
-    ctx.strokeStyle = 'white';
-    ctx.lineWidth = 1;
-
-    // Instanciate a Game instance
-    GAME = new GameEngine(canvas, {
-      scale,
-      gravity: 1,
-      startLevel: 1,
-      player : { 
-        width: 50,
-        height: 50,
-        jumpFactor: -20,
-        speedFactor: 5
-      }
-    });
-    
-    let lastTime = 0;
-    function animate(timeStamp: number) {
-      // [Helper] calculate time it takes to animate 1 frame.
-      // Used to calculate FPS metric and to standardize periodic functions.
-      const deltaTime = timeStamp - lastTime;
-      lastTime = timeStamp;
-      // Reset canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      // Render new frame
-      GAME.render(ctx, deltaTime);
-      // Loop
-      requestAnimationFrame(animate);
-    }
+  // Instanciate a Game instance
+  GAME = new GameEngine(canvas, {
+    scale,
+    gravity: 1,
+    startLevel: 1
+  });
+  // Current work around to avoid undefined game properties 
+  // used in other methods // [ ] refactor this better
+  GAME.start({ 
+    width: 50,
+    height: 50,
+    jumpFactor: -20,
+    speedFactor: 5
+  })
+  
+  let lastTime = 0;
+  function animate(timeStamp: number) {
+    // [Helper] calculate time it takes to animate 1 frame.
+    // Used to calculate FPS metric and to standardize periodic functions.
+    const deltaTime = timeStamp - lastTime;
+    lastTime = timeStamp;
+    // Reset canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Render new frame
+    GAME.render(ctx, deltaTime);
     // Loop
     requestAnimationFrame(animate);
-  })
-}
-let GAME: GameEngine;
-main();
+  }
+  // Loop
+  requestAnimationFrame(animate);
+})
